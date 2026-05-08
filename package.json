@@ -1,0 +1,39 @@
+{
+  "name": "itb",
+  "version": "0.1.0",
+  "description": "Node.js / TypeScript binding for libitb (ITB symmetric cipher)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist dist-test dist-bench *.tsbuildinfo",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.test.json && node --test 'dist-test/test/**/*.test.js'",
+    "smoke": "node dist/smoke.js",
+    "bench:build": "tsc -p tsconfig.bench.json",
+    "bench:single": "tsc -p tsconfig.bench.json && node dist-bench/bench/main.js single",
+    "bench:triple": "tsc -p tsconfig.bench.json && node dist-bench/bench/main.js triple"
+  },
+  "license": "Apache-2.0",
+  "dependencies": {
+    "koffi": "^2.16.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.3"
+  }
+}

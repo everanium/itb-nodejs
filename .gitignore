@@ -1,0 +1,18 @@
+# Node.js
+node_modules/
+package-lock.json
+npm-debug.log*
+
+# TypeScript build output
+dist/
+dist-test/
+dist-bench/
+*.tsbuildinfo
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
