@@ -459,7 +459,7 @@ function buildStreamModesSingle(): StreamMode[] {
       }
     };
     modes.push({
-      tag: 'stream_single_aead_easy',
+      tag: 'stream_single_aead_easy_io',
       buildWire: wireOf,
       runEncrypt: async (cipher, payload) => {
         await wireOf(cipher, payload);
@@ -508,7 +508,7 @@ function buildStreamModesSingle(): StreamMode[] {
       }
     };
     modes.push({
-      tag: 'stream_single_aead_lowlevel',
+      tag: 'stream_single_aead_lowlevel_io',
       buildWire: wireOf,
       runEncrypt: async (cipher, payload) => {
         await wireOf(cipher, payload);
@@ -666,7 +666,7 @@ function buildStreamModesTriple(): StreamMode[] {
       }
     };
     modes.push({
-      tag: 'stream_triple_aead_easy',
+      tag: 'stream_triple_aead_easy_io',
       buildWire: wireOf,
       runEncrypt: async (cipher, payload) => {
         await wireOf(cipher, payload);
@@ -717,7 +717,7 @@ function buildStreamModesTriple(): StreamMode[] {
       }
     };
     modes.push({
-      tag: 'stream_triple_aead_lowlevel',
+      tag: 'stream_triple_aead_lowlevel_io',
       buildWire: wireOf,
       runEncrypt: async (cipher, payload) => {
         await wireOf(cipher, payload);
