@@ -121,7 +121,7 @@ export function buildStreamCasesTriple(): BenchCase[] {
 // timed body. Default config — bit-soup / lock-soup / lock-seed are
 // NOT engaged on these encryptors regardless of the ITB_LOCKSEED env
 // var, so the streaming numbers report the bare streaming overhead
-// independent of the existing single-shot ±LockSeed bench arms.
+// independent of the existing Single Message ±LockSeed bench arms.
 // ────────────────────────────────────────────────────────────────────
 
 function buildEasyEncryptor(mode: number): Encryptor {

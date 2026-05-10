@@ -125,8 +125,17 @@ encryptor at constructor time.
 
 ```javascript
 import { createReadStream, createWriteStream, existsSync, statSync, writeFileSync } from 'node:fs';
+import { PassThrough } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { createHash, randomBytes } from 'node:crypto';
-import { Encryptor } from 'itb';
+import {
+  Cipher,
+  Encryptor,
+  UnwrapStreamReader,
+  WrapStreamWriter,
+  wrapperGenerateKey,
+  wrapperNonceSize,
+} from 'itb';
 
 const SRC_PATH = '/tmp/64mb.src';
 const ENC_PATH = '/tmp/64mb.enc';
@@ -146,15 +155,56 @@ if (!existsSync(SRC_PATH) || statSync(SRC_PATH).size !== 64 * 1024 * 1024) {
   writeFileSync(SRC_PATH, randomBytes(64 * 1024 * 1024));
 }
 
+// Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB inner PRF + seeds keep CSPRNG-fresh randomness per call.
+const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
+
 const enc = new Encryptor('areion512', 1024, 'hmac-blake3', 1);
 try {
+  // Sender — buffer the inner ITB transcript, then pump it through one
+  // wrap-stream session so the on-wire bytes carry no ITB framing.
+  const innerOut = new PassThrough();
   await enc.encryptStreamAuth(
     createReadStream(SRC_PATH, { highWaterMark: CHUNK_SIZE }),
-    createWriteStream(ENC_PATH),
+    innerOut,
     CHUNK_SIZE,
   );
+  innerOut.end();
+  const innerChunks = [];
+  for await (const c of innerOut) innerChunks.push(c);
+  const innerBytes = Buffer.concat(innerChunks);
+
+  // Format-deniability ITB masking via outer-cipher streaming wrapper (AES-128-CTR) - same ~0% overhead in stream mode (Recommended in every case).
+  const ww = new WrapStreamWriter(Cipher.Aes128Ctr, outerKey);
+  let wire;
+  try {
+    wire = Buffer.concat([ww.nonce, ww.update(innerBytes)]);
+  } finally {
+    ww.close();
+  }
+  await pipeline(
+    async function* () { yield wire; },
+    createWriteStream(ENC_PATH),
+  );
+
+  // Receiver — strip the leading nonce, unwrap the body, decrypt.
+  const wireBuf = Buffer.alloc(wire.length);
+  let off = 0;
+  for await (const c of createReadStream(ENC_PATH, { highWaterMark: CHUNK_SIZE })) {
+    c.copy(wireBuf, off);
+    off += c.length;
+  }
+  const nlen = wrapperNonceSize(Cipher.Aes128Ctr);
+  const ur = new UnwrapStreamReader(Cipher.Aes128Ctr, outerKey, wireBuf.subarray(0, nlen));
+  let innerWire;
+  try {
+    innerWire = ur.update(wireBuf.subarray(nlen));
+  } finally {
+    ur.close();
+  }
+  const innerSrc = new PassThrough();
+  innerSrc.end(innerWire);
   await enc.decryptStreamAuth(
-    createReadStream(ENC_PATH, { highWaterMark: CHUNK_SIZE }),
+    innerSrc,
     createWriteStream(DST_PATH),
   );
 } finally {
@@ -219,8 +269,20 @@ the loop.
 
 ```javascript
 import { createReadStream, createWriteStream } from 'node:fs';
+import { PassThrough } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { createHash, randomBytes } from 'node:crypto';
-import { Seed, MAC, encryptStreamAuth, decryptStreamAuth } from 'itb';
+import {
+  Cipher,
+  MAC,
+  Seed,
+  UnwrapStreamReader,
+  WrapStreamWriter,
+  decryptStreamAuth,
+  encryptStreamAuth,
+  wrapperGenerateKey,
+  wrapperNonceSize,
+} from 'itb';
 
 const SRC_PATH = '/tmp/64mb.src';
 const ENC_PATH = '/tmp/64mb.enc';
@@ -235,21 +297,62 @@ async function sha256Of(path) {
   return h.digest('hex');
 }
 
+// Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB inner PRF + seeds keep CSPRNG-fresh randomness per call.
+const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
+
 const noise = new Seed('areion512', 1024);
 const data  = new Seed('areion512', 1024);
 const start = new Seed('areion512', 1024);
 const macKey = randomBytes(32);
 const mac = new MAC('hmac-blake3', macKey);
 try {
+  // Sender — buffer the inner ITB transcript, then pump it through one
+  // wrap-stream session so the on-wire bytes carry no ITB framing.
+  const innerOut = new PassThrough();
   await encryptStreamAuth(
     noise, data, start, mac,
     createReadStream(SRC_PATH, { highWaterMark: CHUNK_SIZE }),
-    createWriteStream(ENC_PATH),
+    innerOut,
     CHUNK_SIZE,
   );
+  innerOut.end();
+  const innerChunks = [];
+  for await (const c of innerOut) innerChunks.push(c);
+  const innerBytes = Buffer.concat(innerChunks);
+
+  // Format-deniability ITB masking via outer-cipher streaming wrapper (AES-128-CTR) - same ~0% overhead in stream mode (Recommended in every case).
+  const ww = new WrapStreamWriter(Cipher.Aes128Ctr, outerKey);
+  let wire;
+  try {
+    wire = Buffer.concat([ww.nonce, ww.update(innerBytes)]);
+  } finally {
+    ww.close();
+  }
+  await pipeline(
+    async function* () { yield wire; },
+    createWriteStream(ENC_PATH),
+  );
+
+  // Receiver — strip the leading nonce, unwrap the body, decrypt.
+  const wireBuf = Buffer.alloc(wire.length);
+  let off = 0;
+  for await (const c of createReadStream(ENC_PATH, { highWaterMark: CHUNK_SIZE })) {
+    c.copy(wireBuf, off);
+    off += c.length;
+  }
+  const nlen = wrapperNonceSize(Cipher.Aes128Ctr);
+  const ur = new UnwrapStreamReader(Cipher.Aes128Ctr, outerKey, wireBuf.subarray(0, nlen));
+  let innerWire;
+  try {
+    innerWire = ur.update(wireBuf.subarray(nlen));
+  } finally {
+    ur.close();
+  }
+  const innerSrc = new PassThrough();
+  innerSrc.end(innerWire);
   await decryptStreamAuth(
     noise, data, start, mac,
-    createReadStream(ENC_PATH, { highWaterMark: CHUNK_SIZE }),
+    innerSrc,
     createWriteStream(DST_PATH),
   );
 } finally {
@@ -320,7 +423,17 @@ authenticated-mode overhead across the Easy Mode bench surface
 ```typescript
 // Sender
 
-import { Encryptor, ITBError, Status, setMaxWorkers } from 'itb';
+import {
+  Cipher,
+  Encryptor,
+  ITBError,
+  Status,
+  setMaxWorkers,
+  unwrapInPlace,
+  wrapInPlace,
+  wrapperGenerateKey,
+  wrapperNonceSize,
+} from 'itb';
 
 // Per-instance configuration — mutates only this encryptor's
 // Config. Two encryptors built side-by-side carry independent
@@ -328,6 +441,9 @@ import { Encryptor, ITBError, Status, setMaxWorkers } from 'itb';
 // after construction. mode: 1 = Single Ouroboros (3 seeds);
 // mode: 3 = Triple Ouroboros (7 seeds).
 using enc = new Encryptor('areion512', 2048, 'hmac-blake3', 1);
+
+// Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB inner PRF + seeds keep CSPRNG-fresh randomness per call.
+const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
 
 enc.setNonceBits(512);    // 512-bit nonce (default: 128-bit)
 enc.setBarrierFill(4);    // CSPRNG fill margin (default: 1, valid: 1, 2, 4, 8, 16, 32)
@@ -359,10 +475,15 @@ const plaintext = new TextEncoder().encode('any text or binary data - including 
 // Authenticated encrypt — 32-byte tag is computed across the
 // entire decrypted capacity and embedded inside the RGBWYOPA
 // container, preserving oracle-free deniability.
-const encrypted = enc.encryptAuth(plaintext);
+const encrypted = Buffer.from(enc.encryptAuth(plaintext));
 console.log(`encrypted: ${encrypted.length} bytes`);
 
-// Send encrypted payload + state blob; Symbol.dispose at scope
+// Format-deniability ITB masking through outer cipher AES-128-CTR with ~0% overhead over ITB Encrypt / Decrypt (Recommended in every case).
+const nonce = wrapInPlace(Cipher.Aes128Ctr, outerKey, encrypted);
+const wire = Buffer.concat([nonce, encrypted]);
+console.log(`wire: ${wire.length} bytes`);
+
+// Send `wire` payload + state blob; Symbol.dispose at scope
 // end (via using) releases the handle and zeroes the
 // per-encryptor output buffer. enc.close() is the explicit
 // zeroisation entry point that does not release the handle.
@@ -370,8 +491,8 @@ console.log(`encrypted: ${encrypted.length} bytes`);
 
 // Receiver
 
-// Receive encrypted payload + state blob
-// const encrypted = ...;
+// Receive `wire` payload + state blob
+// const wire = ...;
 // const blob = ...;
 
 setMaxWorkers(8);   // limit to 8 CPU cores (default: 0 = all CPUs)
@@ -402,12 +523,16 @@ dec.setLockSoup(1);
 // LockSoup / LockSeed) from the saved blob.
 dec.importState(blob);
 
+// Strip the per-stream nonce, recover the inner ITB ciphertext.
+const wireBuf = Buffer.from(wire);
+const recovered = unwrapInPlace(Cipher.Aes128Ctr, outerKey, wireBuf);
+
 // Authenticated decrypt — any single-bit tamper triggers MAC
 // failure (no oracle leak about which byte was tampered).
 // Mismatch surfaces as ITBError with code Status.MacFailure,
 // not a corrupted plaintext.
 try {
-  const decrypted = dec.decryptAuth(encrypted);
+  const decrypted = dec.decryptAuth(recovered);
   console.log(`decrypted: ${new TextDecoder().decode(decrypted)}`);
 } catch (e) {
   if (e instanceof ITBError && e.code === Status.MacFailure) {
@@ -433,7 +558,13 @@ same arguments and calls `importState` to restore.
 ```typescript
 // Sender
 
-import { Encryptor } from 'itb';
+import {
+  Cipher,
+  Encryptor,
+  unwrapInPlace,
+  wrapInPlace,
+  wrapperGenerateKey,
+} from 'itb';
 
 // Per-slot primitive selection (Single Ouroboros, 3 + 1 slots).
 // Every name must share the same native hash width — mixing widths
@@ -449,6 +580,9 @@ using enc = Encryptor.mixedSingle(
   1024,             // keyBits
   'hmac-blake3',    // macName
 );
+
+// Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB inner PRF + seeds keep CSPRNG-fresh randomness per call.
+const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
 
 // Per-instance configuration applies as for the new Encryptor(...)
 // case shown above.
@@ -471,13 +605,17 @@ for (let i = 0; i < 4; i++) {
 
 const blob = enc.exportState();
 const plaintext = new TextEncoder().encode('mixed-primitive Easy Mode payload');
-const encrypted = enc.encryptAuth(plaintext);
+const encrypted = Buffer.from(enc.encryptAuth(plaintext));
+
+// Format-deniability ITB masking through outer cipher AES-128-CTR with ~0% overhead over ITB Encrypt / Decrypt (Recommended in every case).
+const nonce = wrapInPlace(Cipher.Aes128Ctr, outerKey, encrypted);
+const wire = Buffer.concat([nonce, encrypted]);
 
 
 // Receiver
 
-// Receive encrypted payload + state blob
-// const encrypted = ...;
+// Receive `wire` payload + state blob
+// const wire = ...;
 // const blob = ...;
 
 // Receiver constructs a matching mixed encryptor — every per-slot
@@ -496,7 +634,9 @@ using dec = Encryptor.mixedSingle(
 
 dec.importState(blob);
 
-const decrypted = dec.decryptAuth(encrypted);
+const wireBuf = Buffer.from(wire);
+const recovered = unwrapInPlace(Cipher.Aes128Ctr, outerKey, wireBuf);
+const decrypted = dec.decryptAuth(recovered);
 console.log(`decrypted: ${new TextDecoder().decode(decrypted)}`);
 ```
 
@@ -508,16 +648,32 @@ seeds (one shared `noiseSeed` plus three `dataSeed` and three
 `Encryptor` call when `mode === 3` is passed to the constructor.
 
 ```typescript
-import { Encryptor } from 'itb';
+import {
+  Cipher,
+  Encryptor,
+  unwrapInPlace,
+  wrapInPlace,
+  wrapperGenerateKey,
+} from 'itb';
 
 // mode = 3 selects Triple Ouroboros. All other constructor
 // arguments behave identically to the Single (mode = 1) case
 // shown above.
 using enc = new Encryptor('areion512', 2048, 'hmac-blake3', 3);
 
+// Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB inner PRF + seeds keep CSPRNG-fresh randomness per call.
+const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
+
 const plaintext = new TextEncoder().encode('Triple Ouroboros payload');
-const encrypted = enc.encryptAuth(plaintext);
-const decrypted = enc.decryptAuth(encrypted);
+const encrypted = Buffer.from(enc.encryptAuth(plaintext));
+
+// Format-deniability ITB masking through outer cipher AES-128-CTR with ~0% overhead over ITB Encrypt / Decrypt (Recommended in every case).
+const nonce = wrapInPlace(Cipher.Aes128Ctr, outerKey, encrypted);
+const wire = Buffer.concat([nonce, encrypted]);
+
+const wireBuf = Buffer.from(wire);
+const recovered = unwrapInPlace(Cipher.Aes128Ctr, outerKey, wireBuf);
+const decrypted = enc.decryptAuth(recovered);
 ```
 
 `Encryptor.mixedTriple` is the per-slot mixed-primitive
@@ -537,12 +693,16 @@ persistence at the seed layer.
 
 ```typescript
 import {
+  Cipher,
   encryptAuth,
   decryptAuth,
   MAC,
   Seed,
   setBitSoup,
   setLockSoup,
+  unwrapInPlace,
+  wrapInPlace,
+  wrapperGenerateKey,
 } from 'itb';
 import { randomBytes } from 'node:crypto';
 
@@ -562,9 +722,19 @@ using data = new Seed('areion512', 2048);
 using start = new Seed('areion512', 2048);
 using mac = new MAC('hmac-blake3', randomBytes(32));
 
+// Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB inner PRF + seeds keep CSPRNG-fresh randomness per call.
+const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
+
 const plaintext = new TextEncoder().encode('low-level authenticated payload');
-const encrypted = encryptAuth(noise, data, start, mac, plaintext);
-const decrypted = decryptAuth(noise, data, start, mac, encrypted);
+const encrypted = Buffer.from(encryptAuth(noise, data, start, mac, plaintext));
+
+// Format-deniability ITB masking through outer cipher AES-128-CTR with ~0% overhead over ITB Encrypt / Decrypt (Recommended in every case).
+const nonce = wrapInPlace(Cipher.Aes128Ctr, outerKey, encrypted);
+const wire = Buffer.concat([nonce, encrypted]);
+
+const wireBuf = Buffer.from(wire);
+const recovered = unwrapInPlace(Cipher.Aes128Ctr, outerKey, wireBuf);
+const decrypted = decryptAuth(noise, data, start, mac, recovered);
 console.log(`decrypted: ${new TextDecoder().decode(decrypted)}`);
 ```
 
@@ -592,9 +762,24 @@ seven-seed split.
 
 ```typescript
 import { createReadStream, createWriteStream } from 'node:fs';
-import { Seed, encryptStream, decryptStream } from 'itb';
+import { PassThrough } from 'node:stream';
+import {
+  Cipher,
+  Seed,
+  UnwrapStreamReader,
+  WrapStreamWriter,
+  decryptStream,
+  encryptStream,
+  wrapperGenerateKey,
+  wrapperNonceSize,
+} from 'itb';
 
-// Encrypt: read plaintext from disk, write ITB chunks to disk.
+// Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB inner PRF + seeds keep CSPRNG-fresh randomness per call.
+const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
+
+// Encrypt: read plaintext from disk, drive the ITB chunked
+// transcript through one wrap-stream session, write the wrapped
+// bytes to disk.
 async function encryptFile(): Promise<void> {
   using noise = new Seed('areion512', 2048);
   using data = new Seed('areion512', 2048);
@@ -602,16 +787,26 @@ async function encryptFile(): Promise<void> {
 
   const input = createReadStream('plaintext.bin');
   const output = createWriteStream('ciphertext.bin');
+
+  // Format-deniability ITB masking via outer-cipher streaming wrapper (AES-128-CTR) - same ~0% overhead in stream mode (Recommended in every case).
+  const ww = new WrapStreamWriter(Cipher.Aes128Ctr, outerKey);
+  output.write(ww.nonce);
+
+  const innerOut = new PassThrough();
+  innerOut.on('data', (chunk: Buffer) => output.write(ww.update(chunk)));
   // chunk_size: 4 MiB — bulk local crypto, not small-frame
   // network streaming. Each plaintext slice becomes one ITB
   // chunk on the wire.
-  await encryptStream(noise, data, start, input, output, 4 * 1024 * 1024);
+  await encryptStream(noise, data, start, input, innerOut, 4 * 1024 * 1024);
+  innerOut.end();
+  ww.close();
   output.end();
 }
 
-// Decrypt: stream ITB chunks from disk back to disk. The
-// StreamDecryptor probes each chunk's header (parseChunkLen) to
-// learn the on-wire chunk length before reading the body.
+// Decrypt: stream wrapped bytes from disk, strip the leading
+// nonce, unwrap each block, hand the inner ITB transcript to
+// StreamDecryptor (which probes each chunk's header via
+// parseChunkLen to learn the on-wire chunk length).
 async function decryptFile(): Promise<void> {
   using noise = new Seed('areion512', 2048);
   using data = new Seed('areion512', 2048);
@@ -619,7 +814,25 @@ async function decryptFile(): Promise<void> {
 
   const input = createReadStream('ciphertext.bin');
   const output = createWriteStream('decrypted.bin');
-  await decryptStream(noise, data, start, input, output);
+
+  const nlen = wrapperNonceSize(Cipher.Aes128Ctr);
+  const nonceBuf = Buffer.alloc(nlen);
+  let read = 0;
+  for await (const c of input) {
+    const take = Math.min(c.length, nlen - read);
+    (c as Buffer).copy(nonceBuf, read, 0, take);
+    read += take;
+    if (read === nlen) {
+      const tail = (c as Buffer).subarray(take);
+      const ur = new UnwrapStreamReader(Cipher.Aes128Ctr, outerKey, nonceBuf);
+      const innerIn = new PassThrough();
+      if (tail.length > 0) innerIn.write(ur.update(tail));
+      input.on('data', (chunk: Buffer) => innerIn.write(ur.update(chunk)));
+      input.on('end', () => { ur.close(); innerIn.end(); });
+      await decryptStream(noise, data, start, innerIn, output);
+      break;
+    }
+  }
   output.end();
 }
 ```

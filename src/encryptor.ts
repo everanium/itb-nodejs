@@ -805,14 +805,14 @@ export class Encryptor implements Disposable {
     // headroom shape with `_cipherCall` and the low-level
     // `cipher.ts` / `streams.ts` helpers. The Easy Stream-AEAD ABI
     // shares the "compute-internally-then-return-BUFFER_TOO_SMALL"
-    // contract with the single-shot Easy ABI, so probing with a null
+    // contract with the Single Message Easy ABI, so probing with a null
     // out-buffer pays the per-chunk crypto twice; pre-allocating from
     // the formula collapses that to one call in the hot path.
     //
     // Reuses the per-encryptor `_outputCache` (Bonus 1 in
-    // .NEXTBIND.md §7.1) — same scope as the single-shot
+    // .NEXTBIND.md §7.1) — same scope as the Single Message
     // `_cipherCall` path — so the streaming hot loop amortises the
-    // allocation across every chunk just like the single-shot Easy
+    // allocation across every chunk just like the Single Message Easy
     // Mode path does. Returns `_outputCache.slice(...)` (eager copy)
     // so subsequent chunk calls may safely overwrite the cache while
     // the prior chunk's bytes remain queued in the consumer's
@@ -855,7 +855,7 @@ export class Encryptor implements Disposable {
     // matrix.
     //
     // Reuses the per-encryptor `_outputCache` (Bonus 1 in
-    // .NEXTBIND.md §7.1) — same scope as the single-shot
+    // .NEXTBIND.md §7.1) — same scope as the Single Message
     // `_cipherCall` path. The eager `slice` copy below detaches the
     // returned plaintext from the cache so the next chunk's call may
     // safely overwrite the cache while the prior chunk's bytes remain

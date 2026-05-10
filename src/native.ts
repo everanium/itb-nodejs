@@ -527,3 +527,73 @@ export const ITB_Easy_DecryptStreamAuth = lib.func(
     'uint8_t *out, size_t outCap, _Out_ size_t *outLen, ' +
     '_Out_ int *finalFlagOut)',
 );
+
+// ──────────────────────────────────────────────────────────────────
+// Format-deniability wrapper — outer cipher envelope over an ITB
+// ciphertext / bytestream. Three outer ciphers are supported (`"aes"`
+// / `"chacha"` / `"siphash"`); the wire format is
+// `nonce || keystream-XOR(blob)`. See bindings/nodejs/src/wrapper.ts
+// for the typed-idiomatic surface.
+// ──────────────────────────────────────────────────────────────────
+
+export const ITB_WrapperKeySize = lib.func(
+  'int ITB_WrapperKeySize(const char *cipherName, _Out_ size_t *outSize)',
+);
+export const ITB_WrapperNonceSize = lib.func(
+  'int ITB_WrapperNonceSize(const char *cipherName, _Out_ size_t *outSize)',
+);
+
+export const ITB_Wrap = lib.func(
+  'int ITB_Wrap(const char *cipherName, ' +
+    'uint8_t *key, size_t keyLen, ' +
+    'uint8_t *blob, size_t blobLen, ' +
+    'uint8_t *out, size_t outCap, _Out_ size_t *outLen)',
+);
+export const ITB_Unwrap = lib.func(
+  'int ITB_Unwrap(const char *cipherName, ' +
+    'uint8_t *key, size_t keyLen, ' +
+    'uint8_t *wire, size_t wireLen, ' +
+    'uint8_t *out, size_t outCap, _Out_ size_t *outLen)',
+);
+
+export const ITB_WrapInPlace = lib.func(
+  'int ITB_WrapInPlace(const char *cipherName, ' +
+    'uint8_t *key, size_t keyLen, ' +
+    'uint8_t *blob, size_t blobLen, ' +
+    'uint8_t *outNonce, size_t nonceCap)',
+);
+export const ITB_UnwrapInPlace = lib.func(
+  'int ITB_UnwrapInPlace(const char *cipherName, ' +
+    'uint8_t *key, size_t keyLen, ' +
+    'uint8_t *wire, size_t wireLen)',
+);
+
+export const ITB_WrapStreamWriter_Init = lib.func(
+  'int ITB_WrapStreamWriter_Init(const char *cipherName, ' +
+    'uint8_t *key, size_t keyLen, ' +
+    'uint8_t *outNonce, size_t nonceCap, ' +
+    '_Out_ uintptr_t *outHandle)',
+);
+export const ITB_WrapStreamWriter_Update = lib.func(
+  'int ITB_WrapStreamWriter_Update(uintptr_t handle, ' +
+    'uint8_t *src, size_t srcLen, ' +
+    'uint8_t *dst, size_t dstCap)',
+);
+export const ITB_WrapStreamWriter_Free = lib.func(
+  'int ITB_WrapStreamWriter_Free(uintptr_t handle)',
+);
+
+export const ITB_UnwrapStreamReader_Init = lib.func(
+  'int ITB_UnwrapStreamReader_Init(const char *cipherName, ' +
+    'uint8_t *key, size_t keyLen, ' +
+    'uint8_t *wireNonce, size_t nonceLen, ' +
+    '_Out_ uintptr_t *outHandle)',
+);
+export const ITB_UnwrapStreamReader_Update = lib.func(
+  'int ITB_UnwrapStreamReader_Update(uintptr_t handle, ' +
+    'uint8_t *src, size_t srcLen, ' +
+    'uint8_t *dst, size_t dstCap)',
+);
+export const ITB_UnwrapStreamReader_Free = lib.func(
+  'int ITB_UnwrapStreamReader_Free(uintptr_t handle)',
+);

@@ -81,3 +81,22 @@ export {
   StreamEncryptorAuthTriple,
   StreamEncryptorTriple,
 } from './streams.js';
+export {
+  CIPHER_NAMES,
+  Cipher,
+  generateKey as wrapperGenerateKey,
+  InvalidCipherError,
+  InvalidKeyError,
+  InvalidNonceError,
+  keySize as wrapperKeySize,
+  nonceSize as wrapperNonceSize,
+  unwrap,
+  unwrapInPlace,
+  UnwrapStreamReader,
+  wrap,
+  wrapInPlace,
+  WrapperError,
+  WrapperHandleClosedError,
+  WrapStreamWriter,
+} from './wrapper.js';
+export type { CipherName } from './wrapper.js';
