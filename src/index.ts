@@ -50,8 +50,10 @@ export {
   parseChunkLen,
   setBarrierFill,
   setBitSoup,
+  setGcPercent,
   setLockSoup,
   setMaxWorkers,
+  setMemoryLimit,
   setNonceBits,
   version,
 } from './library.js';

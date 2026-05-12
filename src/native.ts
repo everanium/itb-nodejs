@@ -171,6 +171,10 @@ export const ITB_SetNonceBits = lib.func('int ITB_SetNonceBits(int n)');
 export const ITB_GetNonceBits = lib.func('int ITB_GetNonceBits()');
 export const ITB_SetBarrierFill = lib.func('int ITB_SetBarrierFill(int n)');
 export const ITB_GetBarrierFill = lib.func('int ITB_GetBarrierFill()');
+export const ITB_SetMemoryLimit = lib.func(
+  'int64_t ITB_SetMemoryLimit(int64_t limit)',
+);
+export const ITB_SetGCPercent = lib.func('int ITB_SetGCPercent(int pct)');
 
 export const ITB_MaxKeyBits = lib.func('int ITB_MaxKeyBits()');
 export const ITB_Channels = lib.func('int ITB_Channels()');

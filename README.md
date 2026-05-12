@@ -69,7 +69,30 @@ Project metadata: `name = "itb"`, `version = 0.1.0`,
 runtime FFI, cross-runtime Node / Deno / Bun, no native compile);
 dev dependencies are `typescript` and `@types/node`.
 
-## Run the integration test suite
+## Library lookup order
+
+1. `ITB_LIBRARY_PATH` environment variable (absolute path).
+2. `<repo>/dist/<os>-<arch>/libitb.<ext>` resolved by walking up
+   from this module's directory until a matching `dist/` folder is
+   found (raw sources via Node's type stripping or compiled
+   `dist/` / `dist-test/` / `dist-bench/` layouts all resolve).
+3. System loader path (`ld.so.cache`, `DYLD_LIBRARY_PATH`, `PATH`).
+
+## Memory
+
+Two process-wide knobs constrain Go runtime arena pacing. Both readable at libitb load time via env vars:
+
+- `ITB_GOMEMLIMIT=512MiB` — soft memory limit in bytes; supports `B` / `KiB` / `MiB` / `GiB` / `TiB` suffixes.
+- `ITB_GOGC=20` — GC trigger percentage; default `100`, lower triggers GC more aggressively.
+
+Programmatic setters override env-set values at any time. Pass `-1` to either setter to query the current value without changing it.
+
+```typescript
+itb.setMemoryLimit(512n * 1024n * 1024n);
+itb.setGcPercent(20);
+```
+
+## Tests
 
 ```bash
 ./bindings/nodejs/run_tests.sh
@@ -87,14 +110,31 @@ lifecycle. `npm test` compiles the source + tests through
 `tsconfig.test.json` to `dist-test/`, then runs
 `node --test 'dist-test/test/**/*.test.js'`.
 
-## Library lookup order
+## Benchmarks
 
-1. `ITB_LIBRARY_PATH` environment variable (absolute path).
-2. `<repo>/dist/<os>-<arch>/libitb.<ext>` resolved by walking up
-   from this module's directory until a matching `dist/` folder is
-   found (raw sources via Node's type stripping or compiled
-   `dist/` / `dist-test/` / `dist-bench/` layouts all resolve).
-3. System loader path (`ld.so.cache`, `DYLD_LIBRARY_PATH`, `PATH`).
+A custom Go-bench-style harness lives under `bench/` and covers
+the four ops (`encrypt`, `decrypt`, `encrypt_auth`, `decrypt_auth`)
+across the nine PRF-grade primitives plus one mixed-primitive
+variant for both Single and Triple Ouroboros at 1024-bit ITB key
+width and 16 MiB payload. See [`bench/README.md`](bench/README.md)
+for invocation / environment variables / output format and
+[`bench/BENCH.md`](bench/BENCH.md) for recorded throughput results
+across the canonical pass matrix.
+
+The four-pass canonical sweep (Single + Triple × ±LockSeed) that
+fills `bench/BENCH.md` is driven by the wrapper script in the
+binding root:
+
+```bash
+./bindings/nodejs/run_bench.sh                  # full 4-pass canonical sweep
+./bindings/nodejs/run_bench.sh --lockseed-only  # pass 3 + pass 4 only
+```
+
+The harness sets `LD_LIBRARY_PATH` to `dist/linux-amd64/`,
+manages `ITB_LOCKSEED` per pass, and forwards `ITB_NONCE_BITS` /
+`ITB_BENCH_FILTER` / `ITB_BENCH_MIN_SEC` straight through to the
+underlying `npm run bench:single` / `npm run bench:triple`
+invocations.
 
 ## Streaming AEAD
 
@@ -155,7 +195,7 @@ if (!existsSync(SRC_PATH) || statSync(SRC_PATH).size !== 64 * 1024 * 1024) {
   writeFileSync(SRC_PATH, randomBytes(64 * 1024 * 1024));
 }
 
-// Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB inner PRF + seeds keep CSPRNG-fresh randomness per call.
+// Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB Inner seeds + PRF key keep as CSPRNG derived.
 const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
 
 const enc = new Encryptor('areion512', 1024, 'hmac-blake3', 1);
@@ -297,7 +337,7 @@ async function sha256Of(path) {
   return h.digest('hex');
 }
 
-// Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB inner PRF + seeds keep CSPRNG-fresh randomness per call.
+// Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB Inner seeds + PRF key keep as CSPRNG derived.
 const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
 
 const noise = new Seed('areion512', 1024);
@@ -442,7 +482,7 @@ import {
 // mode: 3 = Triple Ouroboros (7 seeds).
 using enc = new Encryptor('areion512', 2048, 'hmac-blake3', 1);
 
-// Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB inner PRF + seeds keep CSPRNG-fresh randomness per call.
+// Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB Inner seeds + PRF key keep as CSPRNG derived.
 const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
 
 enc.setNonceBits(512);    // 512-bit nonce (default: 128-bit)
@@ -581,7 +621,7 @@ using enc = Encryptor.mixedSingle(
   'hmac-blake3',    // macName
 );
 
-// Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB inner PRF + seeds keep CSPRNG-fresh randomness per call.
+// Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB Inner seeds + PRF key keep as CSPRNG derived.
 const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
 
 // Per-instance configuration applies as for the new Encryptor(...)
@@ -661,7 +701,7 @@ import {
 // shown above.
 using enc = new Encryptor('areion512', 2048, 'hmac-blake3', 3);
 
-// Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB inner PRF + seeds keep CSPRNG-fresh randomness per call.
+// Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB Inner seeds + PRF key keep as CSPRNG derived.
 const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
 
 const plaintext = new TextEncoder().encode('Triple Ouroboros payload');
@@ -722,7 +762,7 @@ using data = new Seed('areion512', 2048);
 using start = new Seed('areion512', 2048);
 using mac = new MAC('hmac-blake3', randomBytes(32));
 
-// Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB inner PRF + seeds keep CSPRNG-fresh randomness per call.
+// Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB Inner seeds + PRF key keep as CSPRNG derived.
 const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
 
 const plaintext = new TextEncoder().encode('low-level authenticated payload');
@@ -774,7 +814,7 @@ import {
   wrapperNonceSize,
 } from 'itb';
 
-// Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB inner PRF + seeds keep CSPRNG-fresh randomness per call.
+// Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB Inner seeds + PRF key keep as CSPRNG derived.
 const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
 
 // Encrypt: read plaintext from disk, drive the ITB chunked
@@ -927,6 +967,18 @@ All seeds passed to one `encrypt` / `decrypt` call must share the
 same native hash width. Mixing widths raises
 `ITBError(Status.SeedWidthMix)`.
 
+## MAC primitives
+
+Names match the libitb MAC registry; ordering matches that registry's declaration order.
+
+| MAC | Key bytes | Tag bytes | Underlying primitive |
+|---|---|---|---|
+| `kmac256` | 32 | 32 | KMAC256 (Keccak-derived) |
+| `hmac-sha256` | 32 | 32 | HMAC over SHA-256 |
+| `hmac-blake3` | 32 | 32 | HMAC over BLAKE3 |
+
+`kmac256` and `hmac-sha256` accept keys 16 bytes and longer; the binding fleet's tests and examples use 32 bytes uniformly across primitives for cross-binding consistency. `hmac-blake3` requires exactly 32 bytes by construction.
+
 ## Process-wide configuration
 
 Every setter takes effect for all subsequent encrypt / decrypt
@@ -1064,28 +1116,134 @@ cipher entry point. Pass at least one byte.
 | 24 | `Status.StreamAfterFinal` | Streaming AEAD transcript carries chunk bytes after the terminator; raised as `ITBStreamAfterFinalError` |
 | 99 | `Status.Internal` | Generic "internal" sentinel for paths the caller cannot recover from at the binding layer |
 
-## Benchmarks
+## Constraints
 
-A custom Go-bench-style harness lives under `bench/` and covers
-the four ops (`encrypt`, `decrypt`, `encrypt_auth`, `decrypt_auth`)
-across the nine PRF-grade primitives plus one mixed-primitive
-variant for both Single and Triple Ouroboros at 1024-bit ITB key
-width and 16 MiB payload. See [`bench/README.md`](bench/README.md)
-for invocation / environment variables / output format and
-[`bench/BENCH.md`](bench/BENCH.md) for recorded throughput results
-across the canonical pass matrix.
+- **Node.js 22 minimum.** The package's `package.json` declares
+  `"engines": { "node": ">=22" }`. Earlier runtimes lack the ABI /
+  loader features koffi depends on for the FFI substrate.
+- **TypeScript 6 toolchain.** The build invokes `typescript ^6.0.3`
+  in strict mode; consumers compile their own TypeScript against the
+  bundled `.d.ts` declarations, or import the compiled JavaScript
+  directly from Node.js.
+- **Single distribution.** All consumer-visible declarations live
+  under `src/`; the FFI substrate (`src/sys.ts`) is kept separate so
+  audits can read it independently.
+- **libitb.so required at runtime.** The package loads
+  `dist/<os>-<arch>/libitb.<ext>` via koffi at module import; the
+  shared library must be built first and reachable through the
+  loader's search path.
+- **External runtime deps.** The single non-stdlib runtime dependency
+  is `koffi ^2.16.1`. The test runner uses Node's built-in
+  `node:test` plus `@types/node`.
+- **Frozen C ABI.** The `ITB_*` exports declared by the koffi-parsed
+  signatures (synced from `dist/<os>-<arch>/libitb.h`) are the
+  contract; the binding does not extend or reshape them.
 
-The four-pass canonical sweep (Single + Triple × ±LockSeed) that
-fills `bench/BENCH.md` is driven by the wrapper script in the
-binding root:
+## API Overview
 
-```bash
-./bindings/nodejs/run_bench.sh                  # full 4-pass canonical sweep
-./bindings/nodejs/run_bench.sh --lockseed-only  # pass 3 + pass 4 only
-```
+Every public symbol re-exports through the package entry point
+(`@everanium/itb`). TypeScript callers receive the bundled `.d.ts`;
+JavaScript callers see the same identifiers on the imported module.
 
-The harness sets `LD_LIBRARY_PATH` to `dist/linux-amd64/`,
-manages `ITB_LOCKSEED` per pass, and forwards `ITB_NONCE_BITS` /
-`ITB_BENCH_FILTER` / `ITB_BENCH_MIN_SEC` straight through to the
-underlying `npm run bench:single` / `npm run bench:triple`
-invocations.
+### Library metadata
+
+| Symbol | Purpose |
+|---|---|
+| `version(): string` | Library version `"<major>.<minor>.<patch>"` |
+| `maxKeyBits(): number` | Max supported ITB key width in bits |
+| `channels(): number` | Number of native channel slots |
+| `headerSize(): number` | Current chunk header size in bytes |
+| `parseChunkLen(header: Uint8Array): number` | Parse chunk header, return total on-wire chunk length |
+| `listHashes(): HashEntry[]` / `listMacs(): MacEntry[]` | Catalogue accessors |
+| `lastError(): string` | Per-thread last-error message |
+| `libraryPath(): string` | Resolved `libitb` library path |
+
+### Process-wide configuration
+
+| Symbol | Purpose |
+|---|---|
+| `setBitSoup(mode: number)` / `getBitSoup(): number` | Bit Soup mode toggle |
+| `setLockSoup(mode: number)` / `getLockSoup(): number` | Lock Soup mode toggle |
+| `setMaxWorkers(n: number)` / `getMaxWorkers(): number` | Worker pool cap |
+| `setNonceBits(n: number)` / `getNonceBits(): number` | Nonce width (128 / 256 / 512) |
+| `setBarrierFill(n: number)` / `getBarrierFill(): number` | Barrier-fill factor |
+| `setMemoryLimit(limit: bigint \| number): bigint` | Go runtime heap soft limit in bytes; negative argument = query only |
+| `setGcPercent(pct: number): number` | Go GC trigger percentage; negative argument = query only |
+
+### Seeds and MAC
+
+| Symbol | Purpose |
+|---|---|
+| `new Seed(hashName: string, keyBits: number)` | CSPRNG-fresh seed |
+| `Seed.fromComponents(hashName, keyBits, components)` | Reconstruct from explicit components |
+| `seed.width / seed.hashName / seed.hashKey() / seed.components() / seed.attachLockSeed(lock)` | Introspection + lock-seed attachment |
+| `new MAC(macName: string, key: Uint8Array)` | Construct MAC handle (32-byte keys across the shipped catalogue) |
+
+### Low-level cipher (free functions)
+
+| Symbol | Purpose |
+|---|---|
+| `encrypt(noise, data, start, plaintext): Uint8Array` / `decrypt(...)` | Single Message |
+| `encryptAuth(noise, data, start, mac, plaintext)` / `decryptAuth(...)` | MAC-authenticated counterparts |
+| `encryptTriple(noise, d1, d2, d3, s1, s2, s3, plaintext)` / `decryptTriple(...)` | Triple Ouroboros |
+| `encryptAuthTriple(...)` / `decryptAuthTriple(...)` | Triple Ouroboros MAC-authenticated |
+
+### Easy Mode encryptor
+
+| Symbol | Purpose |
+|---|---|
+| `new Encryptor(primitive, keyBits, opts?)` | Single-primitive constructor |
+| `Encryptor.mixed(primitives, keyBits, opts?)` / `Encryptor.mixed3(primitives, keyBits, opts?)` | Mixed-primitive Single / Triple |
+| `enc.encrypt(pt)` / `enc.decrypt(ct)` | Cipher entry points |
+| `enc.encryptAuth(pt)` / `enc.decryptAuth(ct)` | MAC-authenticated cipher entry points |
+| `enc.setNonceBits / setBarrierFill / setBitSoup / setLockSoup / setLockSeed / setChunkSize` | Per-instance setters |
+| `enc.primitive / macName / keyBits / mode / nonceBits / headerSize / hasPRFKeys / isMixed / seedCount` | Accessors |
+| `enc.prfKey(slot)` / `enc.macKey()` / `enc.seedComponents(slot)` | Key-material accessors |
+| `enc.export()` / `enc.importState(blob)` | State-blob persistence |
+| `peekConfig(blob): PeekedConfig` / `lastMismatchField(): string` | Pre-import discriminator + mismatch-field accessor |
+| `enc.close()` | Release encryptor |
+
+### Streaming AEAD
+
+| Symbol | Purpose |
+|---|---|
+| `encryptStream(read, write, noise, data, start, opts?)` / `decryptStream(...)` | Single Low-Level streams |
+| `encryptStreamTriple(...)` / `decryptStreamTriple(...)` | Triple Low-Level streams |
+| `encryptStreamAuth(read, write, noise, data, start, mac, opts?)` / `decryptStreamAuth(...)` | Single Low-Level Streaming AEAD |
+| `encryptStreamAuthTriple(...)` / `decryptStreamAuthTriple(...)` | Triple Low-Level Streaming AEAD |
+| `StreamEncryptor / StreamDecryptor / StreamEncryptorTriple / StreamDecryptorTriple` | Push-style Low-Level streamers |
+| `StreamEncryptorAuth / StreamDecryptorAuth / StreamEncryptorAuthTriple / StreamDecryptorAuthTriple` | Push-style Streaming AEAD streamers |
+| `DEFAULT_CHUNK_SIZE` / `STREAM_ID_LEN` | Streaming chunk size + stream-id length |
+
+### Native Blob
+
+| Symbol | Purpose |
+|---|---|
+| `new Blob128() / new Blob256() / new Blob512()` | Width-specific Native Blob handles |
+| `blob.setKey / setComponents / setMacKey / setMacName(...)` | Field setters |
+| `blob.getKey / getComponents / getMacKey / getMacName(...)` | Field getters |
+| `blob.export(opts?) / exportTriple(opts?) / import(payload) / importTriple(payload)` | Serialisation |
+| `BlobSlot.N / D / S / L / D1 / D2 / D3 / S1 / S2 / S3` | Slot enum |
+| `BlobExportOpts.None / LockSeed / Mac` | Export opt-in flag bits |
+
+### Wrapper (format-deniability outer cipher)
+
+| Symbol | Purpose |
+|---|---|
+| `Cipher.Aes128Ctr / ChaCha20 / SipHash24` | Cipher enum |
+| `CIPHER_NAMES: readonly CipherName[]` | Canonical name list |
+| `wrapperKeySize(cipher): number` / `wrapperNonceSize(cipher): number` | Cipher dimension accessors |
+| `wrapperGenerateKey(cipher): Uint8Array` | CSPRNG-fresh wrapper key |
+| `wrap(cipher, key, blob): Uint8Array` / `unwrap(cipher, key, wire): Uint8Array` | Single Message Wrap / Unwrap |
+| `wrapInPlace(cipher, key, buf): Uint8Array` / `unwrapInPlace(cipher, key, wire): Uint8Array` | In-place Wrap / Unwrap |
+| `new WrapStreamWriter(cipher, key)` / `new UnwrapStreamReader(cipher, key, wireNonce)` | Streaming wrap writer / unwrap reader |
+| `InvalidCipherError / InvalidKeyError / InvalidNonceError / WrapperError / WrapperHandleClosedError` | Typed exceptions |
+
+### Error model
+
+| Symbol | Purpose |
+|---|---|
+| `ITBError` | Base error class; `.code` carries the numeric status |
+| `ITBEasyMismatchError / ITBBlobModeMismatchError / ITBBlobMalformedError / ITBBlobVersionTooNewError` | Typed subclasses for cold-path discriminators |
+| `ITBStreamTruncatedError / ITBStreamAfterFinalError` | Streaming AEAD transcript-shape exceptions |
+| `Status` (enum) / `StatusCode` (type alias) | Status-code surface |

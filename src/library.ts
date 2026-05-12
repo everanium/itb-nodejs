@@ -29,8 +29,10 @@ import {
   ITB_ParseChunkLen,
   ITB_SetBarrierFill,
   ITB_SetBitSoup,
+  ITB_SetGCPercent,
   ITB_SetLockSoup,
   ITB_SetMaxWorkers,
+  ITB_SetMemoryLimit,
   ITB_SetNonceBits,
   ITB_Version,
 } from './native.js';
@@ -171,4 +173,26 @@ export function setBarrierFill(n: number): void {
 
 export function getBarrierFill(): number {
   return ITB_GetBarrierFill();
+}
+
+/**
+ * Configures the Go runtime's heap-size soft limit (bytes). Pass -1
+ * (or any negative value) to query the current limit without changing
+ * it; the previous limit is returned. Setter calls override any
+ * ITB_GOMEMLIMIT env var set at libitb load time.
+ */
+export function setMemoryLimit(limit: bigint | number): bigint {
+  const arg = typeof limit === 'number' ? BigInt(limit) : limit;
+  return BigInt(ITB_SetMemoryLimit(arg));
+}
+
+/**
+ * Configures the Go runtime's GC trigger percentage. The default is
+ * 100 (GC fires at +100% heap growth); lower values trigger GC more
+ * aggressively. Pass -1 (or any negative value) to query the current
+ * value without changing it; the previous value is returned. Setter
+ * calls override any ITB_GOGC env var set at libitb load time.
+ */
+export function setGcPercent(pct: number): number {
+  return ITB_SetGCPercent(pct | 0);
 }
