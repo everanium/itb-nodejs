@@ -213,7 +213,7 @@ try {
   for await (const c of innerOut) innerChunks.push(c);
   const innerBytes = Buffer.concat(innerChunks);
 
-  // Format-deniability ITB masking via outer-cipher streaming wrapper (AES-128-CTR) - same ~0% overhead in stream mode (Recommended in every case).
+  // Format-deniability ITB masking via outer-cipher wrapper (AES-128-CTR) ~0% overhead (Recommended in every case).
   const ww = new WrapStreamWriter(Cipher.Aes128Ctr, outerKey);
   let wire;
   try {
@@ -360,7 +360,7 @@ try {
   for await (const c of innerOut) innerChunks.push(c);
   const innerBytes = Buffer.concat(innerChunks);
 
-  // Format-deniability ITB masking via outer-cipher streaming wrapper (AES-128-CTR) - same ~0% overhead in stream mode (Recommended in every case).
+  // Format-deniability ITB masking via outer-cipher wrapper (AES-128-CTR) ~0% overhead (Recommended in every case).
   const ww = new WrapStreamWriter(Cipher.Aes128Ctr, outerKey);
   let wire;
   try {
@@ -518,7 +518,7 @@ const plaintext = new TextEncoder().encode('any text or binary data - including 
 const encrypted = Buffer.from(enc.encryptAuth(plaintext));
 console.log(`encrypted: ${encrypted.length} bytes`);
 
-// Format-deniability ITB masking through outer cipher AES-128-CTR with ~0% overhead over ITB Encrypt / Decrypt (Recommended in every case).
+// Format-deniability ITB masking via outer-cipher wrapper (AES-128-CTR) ~0% overhead (Recommended in every case).
 const nonce = wrapInPlace(Cipher.Aes128Ctr, outerKey, encrypted);
 const wire = Buffer.concat([nonce, encrypted]);
 console.log(`wire: ${wire.length} bytes`);
@@ -647,7 +647,7 @@ const blob = enc.exportState();
 const plaintext = new TextEncoder().encode('mixed-primitive Easy Mode payload');
 const encrypted = Buffer.from(enc.encryptAuth(plaintext));
 
-// Format-deniability ITB masking through outer cipher AES-128-CTR with ~0% overhead over ITB Encrypt / Decrypt (Recommended in every case).
+// Format-deniability ITB masking via outer-cipher wrapper (AES-128-CTR) ~0% overhead (Recommended in every case).
 const nonce = wrapInPlace(Cipher.Aes128Ctr, outerKey, encrypted);
 const wire = Buffer.concat([nonce, encrypted]);
 
@@ -707,7 +707,7 @@ const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
 const plaintext = new TextEncoder().encode('Triple Ouroboros payload');
 const encrypted = Buffer.from(enc.encryptAuth(plaintext));
 
-// Format-deniability ITB masking through outer cipher AES-128-CTR with ~0% overhead over ITB Encrypt / Decrypt (Recommended in every case).
+// Format-deniability ITB masking via outer-cipher wrapper (AES-128-CTR) ~0% overhead (Recommended in every case).
 const nonce = wrapInPlace(Cipher.Aes128Ctr, outerKey, encrypted);
 const wire = Buffer.concat([nonce, encrypted]);
 
@@ -768,7 +768,7 @@ const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
 const plaintext = new TextEncoder().encode('low-level authenticated payload');
 const encrypted = Buffer.from(encryptAuth(noise, data, start, mac, plaintext));
 
-// Format-deniability ITB masking through outer cipher AES-128-CTR with ~0% overhead over ITB Encrypt / Decrypt (Recommended in every case).
+// Format-deniability ITB masking via outer-cipher wrapper (AES-128-CTR) ~0% overhead (Recommended in every case).
 const nonce = wrapInPlace(Cipher.Aes128Ctr, outerKey, encrypted);
 const wire = Buffer.concat([nonce, encrypted]);
 
@@ -828,7 +828,7 @@ async function encryptFile(): Promise<void> {
   const input = createReadStream('plaintext.bin');
   const output = createWriteStream('ciphertext.bin');
 
-  // Format-deniability ITB masking via outer-cipher streaming wrapper (AES-128-CTR) - same ~0% overhead in stream mode (Recommended in every case).
+  // Format-deniability ITB masking via outer-cipher wrapper (AES-128-CTR) ~0% overhead (Recommended in every case).
   const ww = new WrapStreamWriter(Cipher.Aes128Ctr, outerKey);
   output.write(ww.nonce);
 
