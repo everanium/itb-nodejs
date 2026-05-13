@@ -1,6 +1,6 @@
 // Node.js eitb — runs every wrapper × ITB example end-to-end.
 //
-// Mirrors `cmd/eitb/main.go` adapted to the Node.js binding asymmetry:
+// Mirrors `tools/eitb/main.go` adapted to the Node.js binding asymmetry:
 // the binding has no `stream.Readable` / `stream.Writable` wrap-layer
 // adapter pair for Non-AEAD streaming. Streaming AEAD wraps the
 // entire bytestream end-to-end via the `WrapStreamWriter` /
@@ -93,7 +93,7 @@ async function drain(stream: PassThrough): Promise<Buffer> {
 }
 
 // ────────────────────────────────────────────────────────────────────
-// Builders — parity with `cmd/eitb/main.go`'s build_easy /
+// Builders — parity with `tools/eitb/main.go`'s build_easy /
 // build_three_seeds / apply_lowlevel_config helpers.
 // ────────────────────────────────────────────────────────────────────
 

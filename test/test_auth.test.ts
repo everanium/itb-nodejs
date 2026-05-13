@@ -1,7 +1,6 @@
 // End-to-end Node.js binding tests for Authenticated Encryption.
 //
-// Mirrors bindings/python/tests/test_auth.py — exercises the same
-// matrix as cmd/cshared/ctest/test_smoke.c auth section: 3 MACs ×
+// Mirrors bindings/python/tests/test_auth.py — exercises 3 MACs ×
 // 3 hash widths × {Single, Triple} round trip plus tamper rejection.
 
 import { test, describe } from 'node:test';
