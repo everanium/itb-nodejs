@@ -711,9 +711,8 @@ export class Encryptor implements Disposable {
         }
         // Fast-path skip: single-element buffer is byte-identical to
         // its sole part. Decrypt-side does not run a wipe pass on the
-        // merged buffer (per the §7.1 carve-out — `Writable.write`
-        // queues the reference until later flush), so the view-vs-copy
-        // distinction is safe at every consumer site below.
+        // merged buffer (`Writable.write` queues the reference until later flush),
+        // so the view-vs-copy distinction is safe at every consumer site below.
         let merged: Uint8Array;
         if (buf.length === 1) {
           merged = buf[0]!;
@@ -809,14 +808,12 @@ export class Encryptor implements Disposable {
     // out-buffer pays the per-chunk crypto twice; pre-allocating from
     // the formula collapses that to one call in the hot path.
     //
-    // Reuses the per-encryptor `_outputCache` (Bonus 1 in
-    // .NEXTBIND.md §7.1) — same scope as the Single Message
+    // Reuses the per-encryptor `_outputCache`. Same scope as the Single Message
     // `_cipherCall` path — so the streaming hot loop amortises the
     // allocation across every chunk just like the Single Message Easy
     // Mode path does. Returns `_outputCache.slice(...)` (eager copy)
     // so subsequent chunk calls may safely overwrite the cache while
-    // the prior chunk's bytes remain queued in the consumer's
-    // `Writable`.
+    // the prior chunk's bytes remain queued in the consumer's `Writable`.
     const cache = this._ensureOutputCache(plaintext.length);
     let rc = ITB_Easy_EncryptStreamAuth(
       this._handle as bigint, ptArg, BigInt(plaintext.length),
@@ -854,8 +851,7 @@ export class Encryptor implements Disposable {
     // barrier-fill / nonce-bits combination outside the measured
     // matrix.
     //
-    // Reuses the per-encryptor `_outputCache` (Bonus 1 in
-    // .NEXTBIND.md §7.1) — same scope as the Single Message
+    // Reuses the per-encryptor `_outputCache`. Same scope as the Single Message
     // `_cipherCall` path. The eager `slice` copy below detaches the
     // returned plaintext from the cache so the next chunk's call may
     // safely overwrite the cache while the prior chunk's bytes remain

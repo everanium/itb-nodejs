@@ -5,8 +5,7 @@
 // (`Encryptor.setNonceBits`) rather than a process-wide config; each
 // encryptor's `headerSize` and `parseChunkLen` track its own
 // nonceBits state without touching the global setNonceBits /
-// getNonceBits accessors. Per-instance setter — no cross-test race
-// (NEXTBIND.md §11.a / §11.k pattern).
+// getNonceBits accessors. Per-instance setter — no cross-test race.
 
 import { test, describe } from 'node:test';
 import { strict as assert } from 'node:assert';

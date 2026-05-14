@@ -764,10 +764,9 @@ function preallocStreamCap(payloadLen: number): number {
 /**
  * Per-stream output buffer cache for the Streaming AEAD per-chunk
  * dispatchers. Mirrors the per-encryptor `_outputCache` field on
- * {@link Encryptor} but lives on the streaming class instance —
- * Bonus 1b in .NEXTBIND.md §7.1. The cache grows on demand with the
- * same wipe-on-grow + 1.25× + 128 KiB envelope shape as
- * `Encryptor._cipherCall`.
+ * {@link Encryptor} but lives on the streaming class instance.
+ * The cache grows on demand with the same wipe-on-grow + 1.25×
+ * + 128 KiB envelope shape as * `Encryptor._cipherCall`.
  *
  * The class is not thread-safe; each
  * {@link StreamEncryptorAuth} / {@link StreamDecryptorAuth} instance
@@ -825,10 +824,9 @@ function emitChunkAuthSingle(
   const cap = preallocStreamCap(plaintext.length);
   // When `cache` is provided (object-based stream class call sites),
   // the per-stream buffer is reused instead of allocating a fresh
-  // Uint8Array per chunk (Bonus 1b in .NEXTBIND.md §7.1). When
-  // omitted, falls back to the per-call allocation — preserves any
-  // forward-compatibility call site that has no stream-class cache
-  // to attach.
+  // Uint8Array per chunk. When omitted, falls back to the per-call
+  // allocation — preserves any forward-compatibility call site that
+  // has no stream-class cache to attach.
   let buf = cache !== undefined
     ? ensureStreamCache(cache, cap)
     : new Uint8Array(cap);
@@ -974,10 +972,9 @@ function consumeChunkAuthSingle(
   // Eager `slice` copy when routing through the per-stream cache: the
   // returned plaintext detaches from the cache so the next chunk's
   // call may safely overwrite the cache while the prior chunk's
-  // bytes remain queued in the consumer's `Writable` (the §7.1
-  // carve-out: `Writable.write` queues the reference until later
-  // flush — overwriting cache bytes mid-queue would corrupt the
-  // queued chunk).
+  // bytes remain queued in the consumer's `Writable`, carve-out:
+  // `Writable.write` queues the reference until later flush. Overwriting
+  // cache bytes mid-queue would corrupt the queued chunk).
   return {
     pt: cache !== undefined ? buf.slice(0, written) : buf.subarray(0, written),
     finalFlag: ff[0] !== 0,
@@ -1072,11 +1069,11 @@ export class StreamEncryptorAuth {
   private prefixEmitted = false;
   /**
    * Per-stream output buffer cache. Grows on demand; `close` /
-   * `[Symbol.dispose]` wipe it before drop. Same Bonus 1b shape as
+   * `[Symbol.dispose]` wipe it before drop. Same shape as
    * the per-encryptor `_outputCache` on {@link Encryptor} — the
    * streaming class owns its own cache because the
    * {@link emitChunkAuthSingle} helper has no encryptor instance to
-   * attach to (.NEXTBIND.md §7.1).
+   * attach to.
    *
    * @internal
    */
@@ -1217,10 +1214,9 @@ export class StreamDecryptorAuth {
   private seenFinal = false;
   private closed = false;
   /**
-   * Per-stream output buffer cache. Same Bonus 1b shape as the
+   * Per-stream output buffer cache. Same shape as the
    * encrypt-side counterpart; reused across every chunk's decrypt
-   * dispatch instead of a fresh `Uint8Array` per chunk
-   * (.NEXTBIND.md §7.1).
+   * dispatch instead of a fresh `Uint8Array` per chunk.
    *
    * @internal
    */
@@ -1256,8 +1252,8 @@ export class StreamDecryptorAuth {
         return;
       }
       // Fast-path skip: single-element buffer is byte-identical to
-      // its sole part. Decrypt-side does not wipe the merged buffer
-      // (§7.1 carve-out — `Writable.write` queues the reference), so
+      // its sole part. Decrypt-side does not wipe the merged buffer.
+      // Carve-out — `Writable.write` queues the reference), so
       // returning the view is safe.
       const merged = this.buf.length === 1
         ? this.buf[0]!
@@ -1380,9 +1376,9 @@ export class StreamEncryptorAuthTriple {
   private closed = false;
   private prefixEmitted = false;
   /**
-   * Per-stream output buffer cache. Same Bonus 1b shape as
+   * Per-stream output buffer cache. Same shape as
    * {@link StreamEncryptorAuth._outBuf}; reused across every chunk's
-   * encrypt dispatch (.NEXTBIND.md §7.1).
+   * encrypt dispatch.
    *
    * @internal
    */
@@ -1532,9 +1528,9 @@ export class StreamDecryptorAuthTriple {
   private seenFinal = false;
   private closed = false;
   /**
-   * Per-stream output buffer cache. Same Bonus 1b shape as
+   * Per-stream output buffer cache. Same shape as
    * {@link StreamDecryptorAuth._outBuf}; reused across every chunk's
-   * decrypt dispatch (.NEXTBIND.md §7.1).
+   * decrypt dispatch.
    *
    * @internal
    */
@@ -1578,8 +1574,8 @@ export class StreamDecryptorAuthTriple {
         return;
       }
       // Fast-path skip: single-element buffer is byte-identical to
-      // its sole part. Decrypt-side does not wipe the merged buffer
-      // (§7.1 carve-out), so returning the view is safe.
+      // its sole part. Decrypt-side does not wipe the merged buffer.
+      // So returning the view is safe.
       const merged = this.buf.length === 1
         ? this.buf[0]!
         : concatU8(this.buf, this.buffered);

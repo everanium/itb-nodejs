@@ -133,7 +133,7 @@ describe('test_easy_persistence', () => {
     // (Triple) seed slots; the exported blob carries the dedicated
     // lockSeed material via the lock_seed:true field, and importState
     // on a fresh encryptor restores the seed slot AND auto-couples
-    // LockSoup + BitSoup overlays (NEXTBIND.md §6).
+    // LockSoup + BitSoup overlays.
     const plaintext = concatU8(
       new TextEncoder().encode('lockseed payload '),
       new Uint8Array(Array.from({ length: 32 }, (_, i) => i)),

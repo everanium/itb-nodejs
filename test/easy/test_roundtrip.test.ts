@@ -5,9 +5,9 @@
 // Mirrors bindings/python/tests/easy/test_roundtrip.py one-to-one.
 // Each Python TestCase.test_* becomes a single test() here; the
 // per-class subTest loops are inlined since node:test has no
-// equivalent of unittest subTest (NEXTBIND.md §11.d — pre-approved).
+// equivalent of unittest subTest..
 //
-// Skipped (canonical skip set, NEXTBIND.md §5):
+// Skipped (canonical skip set):
 //   - test_double_free_idempotent — `using` / Symbol.dispose covers
 //     idempotent disposal at the language level.
 //   - test_context_manager — `using` declaration is the equivalent.
@@ -194,7 +194,7 @@ describe('test_easy_roundtrip', () => {
 
   test('set lock soup couples bit soup', () => {
     // Activating LockSoup auto-couples BitSoup=1 on the same encryptor;
-    // verify by round-tripping a known plaintext (NEXTBIND.md §6).
+    // verify by round-tripping a known plaintext.
     using enc = new Encryptor('blake3', 1024, 'kmac256');
     enc.setLockSoup(1);
     const payload = new TextEncoder().encode('lock-soup payload');
