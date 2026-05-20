@@ -63,7 +63,7 @@ npm install
 npm run build
 ```
 
-Project metadata: `name = "itb"`, `version = 0.1.0`,
+Project metadata: `name = "itb"`, `version = 0.1.1`,
 `type = "module"`, `engines.node = ">=22"`,
 `license = Apache-2.0`. The runtime dependency is `koffi` (modern
 runtime FFI, cross-runtime Node / Deno / Bun, no native compile);
@@ -267,7 +267,7 @@ dependency on the binding:
 ```json
 {
   "name": "itb-stream-aead-example",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "dependencies": {
     "itb": "file:<itb>/bindings/nodejs"
