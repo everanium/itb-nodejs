@@ -86,6 +86,7 @@ export {
 export {
   CIPHER_NAMES,
   Cipher,
+  deriveKey as wrapperDeriveKey,
   generateKey as wrapperGenerateKey,
   InvalidCipherError,
   InvalidKeyError,

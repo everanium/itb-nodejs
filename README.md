@@ -203,6 +203,7 @@ if (!existsSync(SRC_PATH) || statSync(SRC_PATH).size !== 64 * 1024 * 1024) {
 
 // Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB Inner seeds + PRF key keep as CSPRNG derived.
 const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
+// const outerKey = wrapperDeriveKey(Cipher.Aes128Ctr, master);
 
 const enc = new Encryptor('areion512', 1024, 'hmac-blake3', 1);
 try {
@@ -345,6 +346,7 @@ async function sha256Of(path) {
 
 // Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB Inner seeds + PRF key keep as CSPRNG derived.
 const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
+// const outerKey = wrapperDeriveKey(Cipher.Aes128Ctr, master);
 
 const noise = new Seed('areion512', 1024);
 const data  = new Seed('areion512', 1024);
@@ -490,6 +492,7 @@ using enc = new Encryptor('areion512', 2048, 'hmac-blake3', 1);
 
 // Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB Inner seeds + PRF key keep as CSPRNG derived.
 const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
+// const outerKey = wrapperDeriveKey(Cipher.Aes128Ctr, master);
 
 enc.setNonceBits(512);    // 512-bit nonce (default: 128-bit)
 enc.setBarrierFill(4);    // CSPRNG fill margin (default: 1, valid: 1, 2, 4, 8, 16, 32)
@@ -629,6 +632,7 @@ using enc = Encryptor.mixedSingle(
 
 // Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB Inner seeds + PRF key keep as CSPRNG derived.
 const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
+// const outerKey = wrapperDeriveKey(Cipher.Aes128Ctr, master);
 
 // Per-instance configuration applies as for the new Encryptor(...)
 // case shown above.
@@ -709,6 +713,7 @@ using enc = new Encryptor('areion512', 2048, 'hmac-blake3', 3);
 
 // Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB Inner seeds + PRF key keep as CSPRNG derived.
 const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
+// const outerKey = wrapperDeriveKey(Cipher.Aes128Ctr, master);
 
 const plaintext = new TextEncoder().encode('Triple Ouroboros payload');
 const encrypted = Buffer.from(enc.encryptAuth(plaintext));
@@ -770,6 +775,7 @@ using mac = new MAC('hmac-blake3', randomBytes(32));
 
 // Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB Inner seeds + PRF key keep as CSPRNG derived.
 const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
+// const outerKey = wrapperDeriveKey(Cipher.Aes128Ctr, master);
 
 const plaintext = new TextEncoder().encode('low-level authenticated payload');
 const encrypted = Buffer.from(encryptAuth(noise, data, start, mac, plaintext));
@@ -822,6 +828,7 @@ import {
 
 // Outer cipher key - preferred surface for HKDF / ML-KEM / key-rotation policy in user-side application. ITB Inner seeds + PRF key keep as CSPRNG derived.
 const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
+// const outerKey = wrapperDeriveKey(Cipher.Aes128Ctr, master);
 
 // Encrypt: read plaintext from disk, drive the ITB chunked
 // transcript through one wrap-stream session, write the wrapped
