@@ -1243,10 +1243,11 @@ JavaScript callers see the same identifiers on the imported module.
 
 | Symbol | Purpose |
 |---|---|
-| `Cipher.Aes128Ctr / ChaCha20 / SipHash24` | Cipher enum |
+| `Cipher.Aes128Ctr / ChaCha20 / SipHash24 / Areion256 / Areion512 / Blake2b256 / Blake2b512 / Blake2s / Blake3` | Cipher enum |
 | `CIPHER_NAMES: readonly CipherName[]` | Canonical name list |
 | `wrapperKeySize(cipher): number` / `wrapperNonceSize(cipher): number` | Cipher dimension accessors |
 | `wrapperGenerateKey(cipher): Uint8Array` | CSPRNG-fresh wrapper key |
+| `wrapperDeriveKey(cipher, master): Uint8Array` | Deterministic wrapper key from a master secret (>= 32 bytes, e.g. an ML-KEM shared secret) |
 | `wrap(cipher, key, blob): Uint8Array` / `unwrap(cipher, key, wire): Uint8Array` | Single Message Wrap / Unwrap |
 | `wrapInPlace(cipher, key, buf): Uint8Array` / `unwrapInPlace(cipher, key, wire): Uint8Array` | In-place Wrap / Unwrap |
 | `new WrapStreamWriter(cipher, key)` / `new UnwrapStreamReader(cipher, key, wireNonce)` | Streaming wrap writer / unwrap reader |

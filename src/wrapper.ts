@@ -3,9 +3,11 @@
 // TypeScript-idiomatic surface over the 12 ``ITB_Wrap*`` /
 // ``ITB_Unwrap*`` / ``ITB_WrapStream*`` / ``ITB_UnwrapStream*`` /
 // ``ITB_WrapperKeySize`` / ``ITB_WrapperNonceSize`` exports in
-// ``cmd/cshared/main.go``. Wraps an ITB ciphertext under one of three
-// outer keystream ciphers (AES-128-CTR / ChaCha20 / SipHash-2-4 in CTR
-// mode) so the on-wire bytes carry no ITB-specific format pattern (W /
+// ``cmd/cshared/main.go``. Wraps an ITB ciphertext under one of nine
+// PRF-grade outer keystream ciphers (Areion-SoEM-256 / Areion-SoEM-512
+// / SipHash-2-4 in CTR mode / AES-128-CTR / BLAKE2b-256 / BLAKE2b-512 /
+// BLAKE2s / BLAKE3 / ChaCha20 (RFC8439)) so the on-wire bytes carry no
+// ITB-specific format pattern (W /
 // H / container layout for Non-AEAD; 32-byte streamID prefix +
 // per-chunk metadata for Streaming AEAD). The wrap exists for
 // format-deniability ONLY — ITB already provides content-deniability
@@ -37,15 +39,23 @@
 //     const c2 = ww.update(Buffer.from('chunk-2'));
 //     const wire = Buffer.concat([ww.nonce, c1, c2]);
 //
-// The ``Cipher`` enum selects one of three outer ciphers:
+// The ``Cipher`` enum selects one of nine PRF-grade outer ciphers.
+// Each maps to one ITB registry primitive; key and nonce sizes follow
+// the underlying primitive — query them via ``keySize`` / ``nonceSize``:
 //
-//   - ``Cipher.Aes128Ctr`` (`"aescmac"`) — AES-128-CTR with a 16-byte key
-//     + 16-byte nonce. AES-NI accelerated.
-//   - ``Cipher.ChaCha20`` (`"chacha20"`) — ChaCha20 (RFC8439) with a
-//     32-byte key + 12-byte nonce.
-//   - ``Cipher.SipHash24`` (`"siphash24"`) — SipHash-2-4 in CTR mode
-//     with a 16-byte key + 16-byte nonce. Custom CTR construction
-//     over the SipHash-2-4 PRF.
+//   - ``Cipher.Areion256`` (`"areion256"`) — Areion-SoEM-256 in CTR
+//     mode. AES-round-based, AES-NI accelerated.
+//   - ``Cipher.Areion512`` (`"areion512"`) — Areion-SoEM-512 in CTR
+//     mode. AES-round-based, AES-NI accelerated.
+//   - ``Cipher.SipHash24`` (`"siphash24"`) — SipHash-2-4 in CTR mode.
+//     Custom CTR construction over the SipHash-2-4 PRF.
+//   - ``Cipher.Aes128Ctr`` (`"aescmac"`) — AES-128-CTR. AES-NI
+//     accelerated.
+//   - ``Cipher.Blake2b256`` (`"blake2b256"`) — BLAKE2b-256 in CTR mode.
+//   - ``Cipher.Blake2b512`` (`"blake2b512"`) — BLAKE2b-512 in CTR mode.
+//   - ``Cipher.Blake2s`` (`"blake2s"`) — BLAKE2s in CTR mode.
+//   - ``Cipher.Blake3`` (`"blake3"`) — BLAKE3 in CTR mode.
+//   - ``Cipher.ChaCha20`` (`"chacha20"`) — ChaCha20 (RFC8439).
 //
 // Threading. Each ``WrapStreamWriter`` / ``UnwrapStreamReader``
 // instance owns one libitb stream handle and is single-feeder by
@@ -77,13 +87,21 @@ import { Status } from './status.js';
 
 /**
  * Canonical outer cipher names accepted by the wrap surface. Match
- * the ``CipherAES128CTR`` / ``CipherChaCha20`` / ``CipherSipHash24``
- * constants in ``github.com/everanium/itb/wrapper``.
+ * the ``CipherAreion256`` / ``CipherAreion512`` / ``CipherSipHash24`` /
+ * ``CipherAES128CTR`` / ``CipherBLAKE2b256`` / ``CipherBLAKE2b512`` /
+ * ``CipherBLAKE2s`` / ``CipherBLAKE3`` / ``CipherChaCha20`` constants in
+ * ``github.com/everanium/itb/wrapper``.
  */
 export const Cipher = {
   Aes128Ctr: 'aescmac',
   ChaCha20: 'chacha20',
   SipHash24: 'siphash24',
+  Areion256: 'areion256',
+  Areion512: 'areion512',
+  Blake2b256: 'blake2b256',
+  Blake2b512: 'blake2b512',
+  Blake2s: 'blake2s',
+  Blake3: 'blake3',
 } as const;
 
 /** String-literal type of a supported wrapper cipher name. */
@@ -91,9 +109,15 @@ export type CipherName = typeof Cipher[keyof typeof Cipher];
 
 /** Iteration order of every supported outer cipher. */
 export const CIPHER_NAMES: readonly CipherName[] = [
-  Cipher.Aes128Ctr,
-  Cipher.ChaCha20,
+  Cipher.Areion256,
+  Cipher.Areion512,
   Cipher.SipHash24,
+  Cipher.Aes128Ctr,
+  Cipher.Blake2b256,
+  Cipher.Blake2b512,
+  Cipher.Blake2s,
+  Cipher.Blake3,
+  Cipher.ChaCha20,
 ];
 
 // ── Typed errors ───────────────────────────────────────────────────
@@ -108,10 +132,8 @@ export class WrapperError extends ITBError {
 }
 
 /**
- * Raised when ``cipher`` is not one of the canonical
- * {@link Cipher.Aes128Ctr} / {@link Cipher.ChaCha20} /
- * {@link Cipher.SipHash24} values. Carries
- * {@link Status.BadInput}.
+ * Raised when ``cipher`` is not one of the nine PRF-grade outer cipher
+ * names in {@link CIPHER_NAMES}. Carries {@link Status.BadInput}.
  */
 export class InvalidCipherError extends WrapperError {
   constructor(name: string) {
@@ -177,11 +199,7 @@ function isZeroHandle(h: Handle): boolean {
 }
 
 function validateCipher(name: string): CipherName {
-  if (
-    name !== Cipher.Aes128Ctr &&
-    name !== Cipher.ChaCha20 &&
-    name !== Cipher.SipHash24
-  ) {
+  if (!(CIPHER_NAMES as readonly string[]).includes(name)) {
     throw new InvalidCipherError(name);
   }
   return name as CipherName;
@@ -216,7 +234,8 @@ function checkRc(rc: number): void {
 
 /**
  * Returns the byte length of the keystream-cipher key for the named
- * outer cipher (16 / 32 / 16 for `"aescmac"` / `"chacha20"` / `"siphash24"`).
+ * outer cipher. ``cipher`` must be one of the nine PRF-grade names in
+ * {@link CIPHER_NAMES}; the key length follows the underlying primitive.
  *
  * Raises {@link InvalidCipherError} on an unknown cipher name.
  */
@@ -230,7 +249,9 @@ export function keySize(cipher: CipherName): number {
 
 /**
  * Returns the on-wire nonce length the named outer cipher emits per
- * stream (16 / 12 / 16 for `"aescmac"` / `"chacha20"` / `"siphash24"`).
+ * stream. ``cipher`` must be one of the nine PRF-grade names in
+ * {@link CIPHER_NAMES}; the nonce length follows the underlying
+ * primitive.
  *
  * Raises {@link InvalidCipherError} on an unknown cipher name.
  */
@@ -243,10 +264,11 @@ export function nonceSize(cipher: CipherName): number {
 }
 
 /**
- * Returns a fresh CSPRNG key of the size required by ``cipher`` (16
- * / 32 / 16 bytes for `"aescmac"` / `"chacha20"` / `"siphash24"`). Uses
- * Node's {@link randomBytes}. The returned key is opaque bytes; the
- * caller stores or shares it out-of-band.
+ * Returns a fresh CSPRNG key of the size required by ``cipher`` (one
+ * of the nine PRF-grade names in {@link CIPHER_NAMES}; the size follows
+ * the underlying primitive). Uses Node's {@link randomBytes}. The
+ * returned key is opaque bytes; the caller stores or shares it
+ * out-of-band.
  */
 export function generateKey(cipher: CipherName): Buffer {
   return randomBytes(keySize(cipher));
@@ -257,21 +279,17 @@ export function generateKey(cipher: CipherName): Buffer {
  * caller-supplied ``master`` secret (e.g. an ML-KEM shared secret). The
  * result is a deterministic function of ``(cipher, master)``, so both
  * endpoints derive the same key from a shared master. ``master`` must
- * be at least ``keySize(cipher)`` bytes; returns the derived key buffer
- * of length ``keySize(cipher)`` (16 / 32 / 16 bytes for `"aescmac"` /
- * `"chacha20"` / `"siphash24"`).
+ * be at least 32 bytes (the wrapper's uniform security floor); returns
+ * the derived key buffer of length ``keySize(cipher)``. ``cipher`` must
+ * be one of the nine PRF-grade names in {@link CIPHER_NAMES}.
  *
  * Raises {@link InvalidCipherError} on an unknown cipher name and
- * {@link InvalidKeyError} when ``master`` is shorter than the cipher's
- * key size.
+ * {@link InvalidKeyError} when ``master`` is shorter than 32 bytes.
  */
 export function deriveKey(cipher: CipherName, master: Buffer): Buffer {
   const cn = validateCipher(cipher);
   const masterB = ensureBuffer(master, 'master');
   const klen = keySize(cn);
-  if (masterB.length < klen) {
-    throw new InvalidKeyError(cipher, klen, masterB.length);
-  }
   const out = Buffer.alloc(klen);
   const outLen: [number | bigint] = [0];
   const rc = ITB_WrapperDeriveKey(

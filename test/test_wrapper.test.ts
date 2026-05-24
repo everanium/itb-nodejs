@@ -5,13 +5,13 @@
 // bindings/rust/tests/test_wrapper.rs + Itb.Tests/WrapperTests.cs.
 // Covers:
 //
-//   - keySize / nonceSize / generateKey for all three outer ciphers.
-//   - Single Message wrap / unwrap round-trip across the three ciphers.
-//   - In-place wrap / unwrap round-trip across the three ciphers.
-//   - Streaming wrap / unwrap round-trip across the three ciphers.
+//   - keySize / nonceSize / generateKey for all nine outer ciphers.
+//   - Single Message wrap / unwrap round-trip across the nine ciphers.
+//   - In-place wrap / unwrap round-trip across the nine ciphers.
+//   - Streaming wrap / unwrap round-trip across the nine ciphers.
 //   - Mixed in-place / immutable cross-pair (in-place wrap then
 //     immutable unwrap, and vice versa).
-//   - Streaming multi-chunk feed across the three ciphers.
+//   - Streaming multi-chunk feed across the nine ciphers.
 //   - Handle lifecycle stress (close idempotency, post-close update
 //     surfaces WrapperHandleClosedError, FinalizationRegistry
 //     backstop is exercised by simply not calling close on an
@@ -47,15 +47,27 @@ import {
 import type { CipherName } from '../src/index.js';
 
 const EXPECTED_KEY_SIZES: Record<CipherName, number> = {
-  aescmac: 16,
-  chacha20: 32,
+  areion256: 32,
+  areion512: 64,
   siphash24: 16,
+  aescmac: 16,
+  blake2b256: 32,
+  blake2b512: 32,
+  blake2s: 32,
+  blake3: 32,
+  chacha20: 32,
 };
 
 const EXPECTED_NONCE_SIZES: Record<CipherName, number> = {
-  aescmac: 16,
-  chacha20: 12,
+  areion256: 16,
+  areion512: 16,
   siphash24: 16,
+  aescmac: 16,
+  blake2b256: 16,
+  blake2b512: 16,
+  blake2s: 16,
+  blake3: 16,
+  chacha20: 12,
 };
 
 function bytesEqual(a: Buffer, b: Buffer): boolean {
@@ -69,10 +81,29 @@ describe('test_wrapper', () => {
   // ──────────────────────────────────────────────────────────────
 
   test('cipher names exhaustive', () => {
-    assert.deepStrictEqual([...CIPHER_NAMES], ['aescmac', 'chacha20', 'siphash24']);
-    assert.equal(Cipher.Aes128Ctr, 'aescmac');
-    assert.equal(Cipher.ChaCha20, 'chacha20');
+    assert.deepStrictEqual(
+      [...CIPHER_NAMES],
+      [
+        'areion256',
+        'areion512',
+        'siphash24',
+        'aescmac',
+        'blake2b256',
+        'blake2b512',
+        'blake2s',
+        'blake3',
+        'chacha20',
+      ],
+    );
+    assert.equal(Cipher.Areion256, 'areion256');
+    assert.equal(Cipher.Areion512, 'areion512');
     assert.equal(Cipher.SipHash24, 'siphash24');
+    assert.equal(Cipher.Aes128Ctr, 'aescmac');
+    assert.equal(Cipher.Blake2b256, 'blake2b256');
+    assert.equal(Cipher.Blake2b512, 'blake2b512');
+    assert.equal(Cipher.Blake2s, 'blake2s');
+    assert.equal(Cipher.Blake3, 'blake3');
+    assert.equal(Cipher.ChaCha20, 'chacha20');
   });
 
   // ──────────────────────────────────────────────────────────────
@@ -105,8 +136,10 @@ describe('test_wrapper', () => {
 
   for (const cipher of CIPHER_NAMES) {
     test(`deriveKey deterministic + roundtrip ${cipher}`, () => {
-      // 32 random bytes as the master secret (stand-in for an ML-KEM
-      // shared secret; the binding ships no KEM).
+      // 32-byte master secret (stand-in for an ML-KEM shared secret;
+      // the binding ships no KEM). 32 bytes satisfies the wrapper's
+      // uniform security floor for every outer cipher (the kdf layer
+      // truncates / stretches to each cipher's key size).
       const master = randomBytes(32);
       const k1 = wrapperDeriveKey(cipher, master);
       assert.equal(k1.length, EXPECTED_KEY_SIZES[cipher]);
