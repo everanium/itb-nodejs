@@ -1,8 +1,8 @@
 // Entry point for the Node.js Easy Mode bench harness.
 //
 // `argv[2]` selects the pass:
-//   * `single` — runs the Single-Ouroboros 9-primitive + 1-mixed grid.
-//   * `triple` — runs the Triple-Ouroboros 9-primitive + 1-mixed grid.
+//   * `single` — runs the Single-Ouroboros canonical primitive + 1-mixed grid.
+//   * `triple` — runs the Triple-Ouroboros canonical primitive + 1-mixed grid.
 //
 // Each pass walks the canonical 10-row matrix four ops per row (encrypt /
 // decrypt / encrypt + MAC / decrypt + MAC). Pair the two passes with

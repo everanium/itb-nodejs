@@ -14,6 +14,11 @@
 // * ``ITB_NONCE_BITS`` — process-wide nonce width override; valid
 //   values 128 / 256 / 512. Maps to `setNonceBits` before any
 //   encryptor is constructed. Default 128.
+// * ``ITB_LOCKBATCH`` — non-empty / non-``0`` enables Lock Batch (the
+//   performance Lock Soup mode); set with ``ITB_LOCKSEED``. Every Easy
+//   Mode encryptor in this run calls `Encryptor.setLockBatch(1)`.
+//   Inert unless Lock Soup is engaged via ``ITB_LOCKSEED``. Default
+//   off.
 // * ``ITB_LOCKSEED`` — when set to a non-empty / non-``0`` value,
 //   every Easy Mode encryptor in this run calls
 //   `Encryptor.setLockSeed(1)`. The Go side's auto-couple invariant
@@ -84,7 +89,7 @@ export const MIXED_START2 = 'blake2b256';
 export const MIXED_START3 = 'blake3';
 export const MIXED_LOCK_T = 'areion256';
 
-/** Canonical 9-primitive PRF-grade order, mirroring bench_single.py
+/** Canonical PRF-grade order, mirroring bench_single.py
  *  / bench_single.rs. The three below-spec lab primitives (CRC128,
  *  FNV-1a, MD5) are not exposed through the libitb registry and are
  *  therefore absent here by construction. */
@@ -118,6 +123,19 @@ export function envNonceBits(defaultBits = 128): number {
     `ITB_NONCE_BITS="${v}" invalid (expected 128/256/512); using ${defaultBits}`,
   );
   return defaultBits;
+}
+
+/**
+ * `true` when `ITB_LOCKBATCH` is set to a non-empty / non-`0` value.
+ * Triggers `Encryptor.setLockBatch(1)` on every encryptor; inert
+ * unless Lock Soup is engaged via `ITB_LOCKSEED`.
+ */
+export function envLockBatch(): boolean {
+  const v = process.env['ITB_LOCKBATCH'];
+  if (v === undefined || v === '' || v === '0') {
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -218,18 +236,30 @@ async function measure(bench: BenchCase, minSeconds: number): Promise<void> {
   );
 }
 
+/** A lazy bench case descriptor: (name, factory). The factory
+ *  callable builds the BenchCase on demand; it is called immediately
+ *  before timing so peak memory is bounded to one case at a time. */
+export type LazyCase = readonly [string, () => BenchCase | Promise<BenchCase>];
+
 /**
- * Run every case in `cases` and print one Go-bench-style line per
- * case to stdout. Honours `ITB_BENCH_FILTER` for substring scoping
- * and `ITB_BENCH_MIN_SEC` for the per-case wall-clock budget.
+ * Run bench cases one at a time, building each just before timing.
+ *
+ * Accepts a list of (name, factory) pairs where ``factory()`` builds
+ * the BenchCase on demand. This bounds peak RSS to roughly one case
+ * regardless of the total number of cases — the 16–64 MiB payload
+ * allocated by ``factory()`` is eligible for GC before the next
+ * factory is called.
+ *
+ * Honours `ITB_BENCH_FILTER` for substring scoping and
+ * `ITB_BENCH_MIN_SEC` for the per-case wall-clock budget.
  */
-export async function runAll(cases: BenchCase[]): Promise<void> {
+export async function runLazy(lazyCases: LazyCase[]): Promise<void> {
   const flt = envBenchFilter();
   const minSeconds = envBenchMinSec();
 
-  const allNames = cases.map((c) => c.name);
+  const allNames = lazyCases.map(([n]) => n);
   const selected =
-    flt === null ? cases : cases.filter((c) => c.name.includes(flt));
+    flt === null ? lazyCases : lazyCases.filter(([n]) => n.includes(flt));
   if (selected.length === 0) {
     console.error(
       `no bench cases match filter "${flt}"; available: ${JSON.stringify(allNames)}`,
@@ -237,11 +267,14 @@ export async function runAll(cases: BenchCase[]): Promise<void> {
     return;
   }
 
-  const first = selected[0]!;
+  // Use MESSAGE_BYTES as the canonical payload_bytes for the header
+  // (the first case in an unfiltered run is always a wrapper-only case
+  // which uses MESSAGE_BYTES).
   console.log(
-    `# benchmarks=${selected.length} payload_bytes=${first.payloadBytes} min_seconds=${minSeconds}`,
+    `# benchmarks=${selected.length} payload_bytes=${PAYLOAD_16MB} min_seconds=${minSeconds}`,
   );
-  for (const bench of selected) {
+  for (const [, factory] of selected) {
+    const bench = await factory();
     await measure(bench, minSeconds);
   }
 }

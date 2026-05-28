@@ -5,13 +5,13 @@
 // bindings/rust/tests/test_wrapper.rs + Itb.Tests/WrapperTests.cs.
 // Covers:
 //
-//   - keySize / nonceSize / generateKey for all nine outer ciphers.
-//   - Single Message wrap / unwrap round-trip across the nine ciphers.
-//   - In-place wrap / unwrap round-trip across the nine ciphers.
-//   - Streaming wrap / unwrap round-trip across the nine ciphers.
+//   - keySize / nonceSize / generateKey for all outer ciphers.
+//   - Single Message wrap / unwrap round-trip across ciphers.
+//   - In-place wrap / unwrap round-trip across ciphers.
+//   - Streaming wrap / unwrap round-trip across ciphers.
 //   - Mixed in-place / immutable cross-pair (in-place wrap then
 //     immutable unwrap, and vice versa).
-//   - Streaming multi-chunk feed across the nine ciphers.
+//   - Streaming multi-chunk feed across ciphers.
 //   - Handle lifecycle stress (close idempotency, post-close update
 //     surfaces WrapperHandleClosedError, FinalizationRegistry
 //     backstop is exercised by simply not calling close on an
@@ -49,24 +49,24 @@ import type { CipherName } from '../src/index.js';
 const EXPECTED_KEY_SIZES: Record<CipherName, number> = {
   areion256: 32,
   areion512: 64,
-  siphash24: 16,
-  aescmac: 16,
   blake2b256: 32,
   blake2b512: 32,
   blake2s: 32,
   blake3: 32,
+  aescmac: 16,
+  siphash24: 16,
   chacha20: 32,
 };
 
 const EXPECTED_NONCE_SIZES: Record<CipherName, number> = {
   areion256: 16,
   areion512: 16,
-  siphash24: 16,
-  aescmac: 16,
   blake2b256: 16,
   blake2b512: 16,
   blake2s: 16,
   blake3: 16,
+  aescmac: 16,
+  siphash24: 16,
   chacha20: 12,
 };
 
@@ -86,23 +86,23 @@ describe('test_wrapper', () => {
       [
         'areion256',
         'areion512',
-        'siphash24',
-        'aescmac',
         'blake2b256',
         'blake2b512',
         'blake2s',
         'blake3',
+        'aescmac',
+        'siphash24',
         'chacha20',
       ],
     );
     assert.equal(Cipher.Areion256, 'areion256');
     assert.equal(Cipher.Areion512, 'areion512');
-    assert.equal(Cipher.SipHash24, 'siphash24');
-    assert.equal(Cipher.Aes128Ctr, 'aescmac');
     assert.equal(Cipher.Blake2b256, 'blake2b256');
     assert.equal(Cipher.Blake2b512, 'blake2b512');
     assert.equal(Cipher.Blake2s, 'blake2s');
     assert.equal(Cipher.Blake3, 'blake3');
+    assert.equal(Cipher.Aes128Ctr, 'aescmac');
+    assert.equal(Cipher.SipHash24, 'siphash24');
     assert.equal(Cipher.ChaCha20, 'chacha20');
   });
 

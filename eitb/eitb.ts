@@ -11,9 +11,7 @@
 // function `encrypt(...)`), frames `u32_LE_len || ct`, and pushes
 // through the wrap-stream writer.
 //
-// Matrix: 8 examples × 9 outer ciphers (areion256 / areion512 /
-// siphash24 / aescmac / blake2b256 / blake2b512 / blake2s / blake3 /
-// chacha20) = 72 PASS/FAIL cells.
+// Matrix: 8 examples × outer ciphers.
 //
 // Examples covered:
 //
@@ -58,6 +56,7 @@ import {
   setBarrierFill,
   setBitSoup,
   setLockSoup,
+  setLockBatch,
   setMaxWorkers,
   setNonceBits,
   unwrapInPlace,
@@ -104,6 +103,7 @@ function buildEasy(macName: string | null, keyBits: number): Encryptor {
   enc.setBarrierFill(4);
   enc.setBitSoup(1);
   enc.setLockSoup(1);
+  enc.setLockBatch(1);
   return enc;
 }
 
@@ -120,6 +120,7 @@ function applyLowLevelConfig(): void {
   setBarrierFill(4);
   setBitSoup(1);
   setLockSoup(1);
+  setLockBatch(1);
 }
 
 function disposeSeeds(seeds: Seed[]): void {
@@ -643,9 +644,9 @@ function printHelp(): void {
       'eitb — runs every wrapper × ITB example end-to-end.',
       '',
       'Usage:',
-      '  node dist-eitb/eitb/eitb.js [--example <substr>] [--cipher <areion256|areion512|siphash24|aescmac|blake2b256|blake2b512|blake2s|blake3|chacha20>] [-v]',
+      '  node dist-eitb/eitb/eitb.js [--example <substr>] [--cipher <ciphername>] [-v]',
       '',
-      'Without flags runs the full 8 × 3 = 24 example × cipher matrix.',
+      'Without flags runs the full 8 × ciphers = cipher matrix.',
     ].join('\n'),
   );
 }

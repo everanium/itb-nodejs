@@ -1,16 +1,16 @@
 // Easy Mode Single-Ouroboros benchmarks for the Node.js binding.
 //
-// Mirrors the BenchmarkSingle* cohort from itb_ext_test.go for the
-// nine PRF-grade primitives, locked at 1024-bit ITB key width and 16
+// Mirrors the BenchmarkSingle* cohort from itb_ext_test.go for
+// PRF-grade primitives, locked at 1024-bit ITB key width and 16
 // MiB CSPRNG-filled payload. One mixed-primitive variant
-// (`Encryptor.mixedSingle` with BLAKE3 / BLAKE2s / BLAKE2b-256 +
-// Areion-SoEM-256 dedicated lockSeed) covers the Easy Mode Mixed
-// surface alongside the single-primitive grid.
+// (`Encryptor.mixedSingle` + dedicated lockSeed) covers the
+// Easy Mode Mixed surface alongside the single-primitive grid.
 //
 // Run with:
 //
 //   npm run bench:single
 //
+//   ITB_NONCE_BITS=512 ITB_LOCKSEED=1 ITB_LOCKBATCH=1 npm run bench:single
 //   ITB_NONCE_BITS=512 ITB_LOCKSEED=1 npm run bench:single
 //
 //   ITB_BENCH_FILTER=blake3_encrypt npm run bench:single
@@ -35,12 +35,13 @@ import {
   MIXED_START,
   PAYLOAD_16MB,
   PRIMITIVES_CANONICAL,
+  envLockBatch,
   envLockSeed,
   envNonceBits,
-  runAll,
+  runLazy,
 } from './common.js';
-import type { BenchCase } from './common.js';
-import { buildStreamCasesSingle } from './bench-stream.js';
+import type { BenchCase, LazyCase } from './common.js';
+import { buildStreamLazyCasesSingle } from './bench-stream.js';
 
 const PAYLOAD_BYTES = PAYLOAD_16MB;
 
@@ -48,11 +49,15 @@ const PAYLOAD_BYTES = PAYLOAD_16MB;
  * When `ITB_LOCKSEED` is set the harness flips the dedicated
  * lockSeed channel on every encryptor. Easy Mode auto-couples
  * BitSoup + LockSoup as a side effect, so no separate calls are
- * issued.
+ * issued. When `ITB_LOCKBATCH` is also set, enable the Lock Batch
+ * performance Lock Soup mode on the same encryptor.
  */
 function applyLockSeedIfRequested(enc: Encryptor): void {
   if (envLockSeed()) {
     enc.setLockSeed(1);
+  }
+  if (envLockBatch()) {
+    enc.setLockBatch(1);
   }
 }
 
@@ -70,7 +75,7 @@ function buildSingle(primitive: string): Encryptor {
 /**
  * Construct a mixed-primitive Single-Ouroboros encryptor matching
  * the README Quick Start composition (BLAKE3 noise / BLAKE2s data /
- * BLAKE2b-256 start). The dedicated Areion-SoEM-256 lockSeed slot is
+ * BLAKE2b-256 start). The dedicated lockSeed slot is
  * allocated only when `ITB_LOCKSEED` is set, so the no-LockSeed
  * bench arm measures the plain mixed-primitive cost without the
  * BitSoup + LockSoup auto-couple. The four primitive names share
@@ -161,41 +166,24 @@ function makeDecryptAuthCase(name: string, enc: Encryptor): BenchCase {
   };
 }
 
-/**
- * Assemble the full case list: 9 single-primitive entries × 4 ops
- * plus 1 mixed entry × 4 ops = 40 cases. Order is primitive-major /
- * op-minor so a filter on a primitive name keeps all four ops
- * grouped together in the output.
- */
-function buildCases(): BenchCase[] {
-  const cases: BenchCase[] = [];
+/** Build lazy factories for the 40 message cases + 8 streaming cases. */
+function buildLazyCases(): LazyCase[] {
+  const facs: LazyCase[] = [];
   for (const prim of PRIMITIVES_CANONICAL) {
     const base = `bench_single_${prim}_${KEY_BITS}bit`;
-    cases.push(makeEncryptCase(`${base}_encrypt_16mb`, buildSingle(prim)));
-    cases.push(makeDecryptCase(`${base}_decrypt_16mb`, buildSingle(prim)));
-    cases.push(
-      makeEncryptAuthCase(`${base}_encrypt_auth_16mb`, buildSingle(prim)),
-    );
-    cases.push(
-      makeDecryptAuthCase(`${base}_decrypt_auth_16mb`, buildSingle(prim)),
-    );
+    const p = prim;
+    facs.push([`${base}_encrypt_16mb`, () => makeEncryptCase(`${base}_encrypt_16mb`, buildSingle(p))]);
+    facs.push([`${base}_decrypt_16mb`, () => makeDecryptCase(`${base}_decrypt_16mb`, buildSingle(p))]);
+    facs.push([`${base}_encrypt_auth_16mb`, () => makeEncryptAuthCase(`${base}_encrypt_auth_16mb`, buildSingle(p))]);
+    facs.push([`${base}_decrypt_auth_16mb`, () => makeDecryptAuthCase(`${base}_decrypt_auth_16mb`, buildSingle(p))]);
   }
   const baseMixed = `bench_single_mixed_${KEY_BITS}bit`;
-  cases.push(makeEncryptCase(`${baseMixed}_encrypt_16mb`, buildMixedSingle()));
-  cases.push(makeDecryptCase(`${baseMixed}_decrypt_16mb`, buildMixedSingle()));
-  cases.push(
-    makeEncryptAuthCase(
-      `${baseMixed}_encrypt_auth_16mb`,
-      buildMixedSingle(),
-    ),
-  );
-  cases.push(
-    makeDecryptAuthCase(
-      `${baseMixed}_decrypt_auth_16mb`,
-      buildMixedSingle(),
-    ),
-  );
-  return cases;
+  facs.push([`${baseMixed}_encrypt_16mb`, () => makeEncryptCase(`${baseMixed}_encrypt_16mb`, buildMixedSingle())]);
+  facs.push([`${baseMixed}_decrypt_16mb`, () => makeDecryptCase(`${baseMixed}_decrypt_16mb`, buildMixedSingle())]);
+  facs.push([`${baseMixed}_encrypt_auth_16mb`, () => makeEncryptAuthCase(`${baseMixed}_encrypt_auth_16mb`, buildMixedSingle())]);
+  facs.push([`${baseMixed}_decrypt_auth_16mb`, () => makeDecryptAuthCase(`${baseMixed}_decrypt_auth_16mb`, buildMixedSingle())]);
+  facs.push(...buildStreamLazyCasesSingle());
+  return facs;
 }
 
 /** Bench entry point invoked by `main.ts`. */
@@ -208,7 +196,5 @@ export async function runSingle(): Promise<void> {
     `# easy_single primitives=${PRIMITIVES_CANONICAL.length} key_bits=${KEY_BITS} mac=${MAC_NAME} nonce_bits=${nonceBits} lockseed=${envLockSeed() ? 'on' : 'off'} workers=auto`,
   );
 
-  const cases = buildCases();
-  cases.push(...buildStreamCasesSingle());
-  await runAll(cases);
+  await runLazy(buildLazyCases());
 }

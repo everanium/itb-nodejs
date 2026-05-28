@@ -165,6 +165,8 @@ export const ITB_SetBitSoup = lib.func('int ITB_SetBitSoup(int mode)');
 export const ITB_GetBitSoup = lib.func('int ITB_GetBitSoup()');
 export const ITB_SetLockSoup = lib.func('int ITB_SetLockSoup(int mode)');
 export const ITB_GetLockSoup = lib.func('int ITB_GetLockSoup()');
+export const ITB_SetLockBatch = lib.func('int ITB_SetLockBatch(int mode)');
+export const ITB_GetLockBatch = lib.func('int ITB_GetLockBatch()');
 export const ITB_SetMaxWorkers = lib.func('int ITB_SetMaxWorkers(int n)');
 export const ITB_GetMaxWorkers = lib.func('int ITB_GetMaxWorkers()');
 export const ITB_SetNonceBits = lib.func('int ITB_SetNonceBits(int n)');
@@ -248,6 +250,9 @@ export const ITB_Easy_SetBitSoup = lib.func(
 );
 export const ITB_Easy_SetLockSoup = lib.func(
   'int ITB_Easy_SetLockSoup(uintptr_t handle, int mode)',
+);
+export const ITB_Easy_SetLockBatch = lib.func(
+  'int ITB_Easy_SetLockBatch(uintptr_t handle, int mode)',
 );
 export const ITB_Easy_SetLockSeed = lib.func(
   'int ITB_Easy_SetLockSeed(uintptr_t handle, int mode)',

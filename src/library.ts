@@ -14,6 +14,7 @@ import {
   ITB_GetBarrierFill,
   ITB_GetBitSoup,
   ITB_GetLockSoup,
+  ITB_GetLockBatch,
   ITB_GetMaxWorkers,
   ITB_GetNonceBits,
   ITB_HashCount,
@@ -31,6 +32,7 @@ import {
   ITB_SetBitSoup,
   ITB_SetGCPercent,
   ITB_SetLockSoup,
+  ITB_SetLockBatch,
   ITB_SetMaxWorkers,
   ITB_SetMemoryLimit,
   ITB_SetNonceBits,
@@ -147,6 +149,19 @@ export function setLockSoup(mode: number): void {
 
 export function getLockSoup(): number {
   return ITB_GetLockSoup();
+}
+
+/**
+ * Sets the process-wide Lock Batch mode (0 = off, non-zero = on).
+ * Per-chunk PRF batching for the Lock Soup overlay; same lifecycle
+ * rules as `setLockSoup`; inert unless Lock Soup is engaged.
+ */
+export function setLockBatch(mode: number): void {
+  check(ITB_SetLockBatch(mode | 0));
+}
+
+export function getLockBatch(): number {
+  return ITB_GetLockBatch();
 }
 
 export function setMaxWorkers(n: number): void {

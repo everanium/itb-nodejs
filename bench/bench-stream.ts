@@ -62,7 +62,7 @@ import {
 } from '../src/streams.js';
 
 import { KEY_BITS, MAC_NAME } from './common.js';
-import type { BenchCase } from './common.js';
+import type { BenchCase, LazyCase } from './common.js';
 
 /** Streaming primitive — Areion-SoEM-512. */
 const STREAM_PRIMITIVE = 'areion512';
@@ -99,6 +99,24 @@ export function buildStreamCasesSingle(): BenchCase[] {
 }
 
 /**
+ * Return eight Single Ouroboros streaming-bench lazy factories.
+ * Each factory is called just before its case is measured.
+ */
+export function buildStreamLazyCasesSingle(): LazyCase[] {
+  const base = `bench_single_stream_${STREAM_PRIMITIVE}_${KEY_BITS}bit_64mb`;
+  return [
+    [`${base}_easy_encrypt_aead_io`, () => makeEasyAeadIoEncryptSingle(`${base}_easy_encrypt_aead_io`)],
+    [`${base}_easy_decrypt_aead_io`, () => makeEasyAeadIoDecryptSingle(`${base}_easy_decrypt_aead_io`)],
+    [`${base}_easy_encrypt_userloop`, () => makeEasyUserLoopEncryptSingle(`${base}_easy_encrypt_userloop`)],
+    [`${base}_easy_decrypt_userloop`, () => makeEasyUserLoopDecryptSingle(`${base}_easy_decrypt_userloop`)],
+    [`${base}_lowlevel_encrypt_aead_io`, () => makeLowLevelAeadIoEncryptSingle(`${base}_lowlevel_encrypt_aead_io`)],
+    [`${base}_lowlevel_decrypt_aead_io`, () => makeLowLevelAeadIoDecryptSingle(`${base}_lowlevel_decrypt_aead_io`)],
+    [`${base}_lowlevel_encrypt_userloop`, () => makeLowLevelUserLoopEncryptSingle(`${base}_lowlevel_encrypt_userloop`)],
+    [`${base}_lowlevel_decrypt_userloop`, () => makeLowLevelUserLoopDecryptSingle(`${base}_lowlevel_decrypt_userloop`)],
+  ];
+}
+
+/**
  * Build the eight Triple Ouroboros streaming-bench cases:
  * Easy + Low-Level, encrypt + decrypt, AEAD-IO + UserLoop.
  */
@@ -114,6 +132,24 @@ export function buildStreamCasesTriple(): BenchCase[] {
   cases.push(makeLowLevelUserLoopEncryptTriple(`${base}_lowlevel_encrypt_userloop`));
   cases.push(makeLowLevelUserLoopDecryptTriple(`${base}_lowlevel_decrypt_userloop`));
   return cases;
+}
+
+/**
+ * Return eight Triple Ouroboros streaming-bench lazy factories.
+ * Each factory is called just before its case is measured.
+ */
+export function buildStreamLazyCasesTriple(): LazyCase[] {
+  const base = `bench_triple_stream_${STREAM_PRIMITIVE}_${KEY_BITS}bit_64mb`;
+  return [
+    [`${base}_easy_encrypt_aead_io`, () => makeEasyAeadIoEncryptTriple(`${base}_easy_encrypt_aead_io`)],
+    [`${base}_easy_decrypt_aead_io`, () => makeEasyAeadIoDecryptTriple(`${base}_easy_decrypt_aead_io`)],
+    [`${base}_easy_encrypt_userloop`, () => makeEasyUserLoopEncryptTriple(`${base}_easy_encrypt_userloop`)],
+    [`${base}_easy_decrypt_userloop`, () => makeEasyUserLoopDecryptTriple(`${base}_easy_decrypt_userloop`)],
+    [`${base}_lowlevel_encrypt_aead_io`, () => makeLowLevelAeadIoEncryptTriple(`${base}_lowlevel_encrypt_aead_io`)],
+    [`${base}_lowlevel_decrypt_aead_io`, () => makeLowLevelAeadIoDecryptTriple(`${base}_lowlevel_decrypt_aead_io`)],
+    [`${base}_lowlevel_encrypt_userloop`, () => makeLowLevelUserLoopEncryptTriple(`${base}_lowlevel_encrypt_userloop`)],
+    [`${base}_lowlevel_decrypt_userloop`, () => makeLowLevelUserLoopDecryptTriple(`${base}_lowlevel_decrypt_userloop`)],
+  ];
 }
 
 // ────────────────────────────────────────────────────────────────────

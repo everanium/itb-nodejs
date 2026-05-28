@@ -120,7 +120,7 @@ lifecycle. `npm test` compiles the source + tests through
 
 A custom Go-bench-style harness lives under `bench/` and covers
 the four ops (`encrypt`, `decrypt`, `encrypt_auth`, `decrypt_auth`)
-across the nine PRF-grade primitives plus one mixed-primitive
+across PRF-grade primitives plus one mixed-primitive
 variant for both Single and Triple Ouroboros at 1024-bit ITB key
 width and 16 MiB payload. See [`bench/README.md`](bench/README.md)
 for invocation / environment variables / output format and
@@ -501,6 +501,11 @@ enc.setBitSoup(1);        // optional bit-level split ("bit-soup"; default: 0 = 
 enc.setLockSoup(1);       // optional Insane Interlocked Mode: per-chunk PRF-keyed
                           // bit-permutation overlay on top of bit-soup;
                           // auto-enabled for Single Ouroboros if setBitSoup(1) is on
+enc.setLockBatch(1);      // Lock Batch is the performance Lock Soup mode: recommended
+                          // in every case when the configured hash is PRF-grade, since
+                          // security is preserved under the PRF assumption while
+                          // throughput rises. Symmetric option — set identically on
+                          // the encrypt and decrypt sides.
 
 // enc.setLockSeed(1);    // optional dedicated lockSeed for the bit-permutation
                           // derivation channel — separates that PRF's keying
@@ -566,10 +571,11 @@ dec.setNonceBits(512);
 dec.setBarrierFill(4);
 dec.setBitSoup(1);
 dec.setLockSoup(1);
+dec.setLockBatch(1);      // Recommended under the PRF assumption — the performance Lock Soup mode; symmetric, set on both sides.
 
 // Restore PRF keys, seed components, MAC key, and the per-instance
 // configuration overrides (NonceBits / BarrierFill / BitSoup /
-// LockSoup / LockSeed) from the saved blob.
+// LockSoup / LockBatch / LockSeed) from the saved blob.
 dec.importState(blob);
 
 // Strip the per-stream nonce, recover the inner ITB ciphertext.
@@ -765,6 +771,7 @@ import { randomBytes } from 'node:crypto';
 // flags on every encrypt / decrypt call.
 setBitSoup(1);
 setLockSoup(1);
+setLockBatch(1);  // Recommended under the PRF assumption — the performance Lock Soup mode; symmetric, set on both sides.
 
 // Three Single-Ouroboros seeds and one MAC handle. Seeds are
 // CSPRNG-keyed; persistence-restore would use Seed.fromComponents.
@@ -966,9 +973,7 @@ dedicated lockSeed slot), `Mac=2` (include the MAC key + name).
 
 ## Hash primitives (Single / Triple)
 
-Names match the canonical `hashes/` registry: `areion256`,
-`areion512`, `siphash24`, `aescmac`, `blake2b256`, `blake2b512`,
-`blake2s`, `blake3`, `chacha20`. Triple Ouroboros (3× security)
+Names match the canonical `hashes/` registry. Triple Ouroboros
 takes seven seeds (one shared `noiseSeed` plus three `dataSeed`
 and three `startSeed`) via `encryptTriple` / `decryptTriple` and
 the authenticated counterparts `encryptAuthTriple` /
@@ -1007,6 +1012,7 @@ do not consult these globals after construction.
 | `setBarrierFill(n)` | 1, 2, 4, 8, 16, 32 | 1 |
 | `setBitSoup(mode)` | 0 (off), non-zero (on) | 0 |
 | `setLockSoup(mode)` | 0 (off), non-zero (on) | 0 |
+| `setLockBatch(mode)` | 0 (off), non-zero (on) | 0 |
 
 Read-only accessors: `maxKeyBits()`, `channels()`, `headerSize()`,
 `version()`.
@@ -1177,6 +1183,7 @@ JavaScript callers see the same identifiers on the imported module.
 |---|---|
 | `setBitSoup(mode: number)` / `getBitSoup(): number` | Bit Soup mode toggle |
 | `setLockSoup(mode: number)` / `getLockSoup(): number` | Lock Soup mode toggle |
+| `setLockBatch(mode: number)` / `getLockBatch(): number` | Lock Batch mode toggle (performance variant of Lock Soup; recommended under the PRF assumption; symmetric; inert unless Lock Soup is engaged) |
 | `setMaxWorkers(n: number)` / `getMaxWorkers(): number` | Worker pool cap |
 | `setNonceBits(n: number)` / `getNonceBits(): number` | Nonce width (128 / 256 / 512) |
 | `setBarrierFill(n: number)` / `getBarrierFill(): number` | Barrier-fill factor |
@@ -1209,7 +1216,7 @@ JavaScript callers see the same identifiers on the imported module.
 | `Encryptor.mixed(primitives, keyBits, opts?)` / `Encryptor.mixed3(primitives, keyBits, opts?)` | Mixed-primitive Single / Triple |
 | `enc.encrypt(pt)` / `enc.decrypt(ct)` | Cipher entry points |
 | `enc.encryptAuth(pt)` / `enc.decryptAuth(ct)` | MAC-authenticated cipher entry points |
-| `enc.setNonceBits / setBarrierFill / setBitSoup / setLockSoup / setLockSeed / setChunkSize` | Per-instance setters |
+| `enc.setNonceBits / setBarrierFill / setBitSoup / setLockSoup / setLockBatch / setLockSeed / setChunkSize` | Per-instance setters |
 | `enc.primitive / macName / keyBits / mode / nonceBits / headerSize / hasPRFKeys / isMixed / seedCount` | Accessors |
 | `enc.prfKey(slot)` / `enc.macKey()` / `enc.seedComponents(slot)` | Key-material accessors |
 | `enc.export()` / `enc.importState(blob)` | State-blob persistence |
@@ -1243,7 +1250,7 @@ JavaScript callers see the same identifiers on the imported module.
 
 | Symbol | Purpose |
 |---|---|
-| `Cipher.Aes128Ctr / ChaCha20 / SipHash24 / Areion256 / Areion512 / Blake2b256 / Blake2b512 / Blake2s / Blake3` | Cipher enum |
+| `Cipher.Areion256 / Areion512 / Blake2b256 / Blake2b512 / Blake2s / Blake3 / Aes128Ctr / SipHash24 / ChaCha20 / etc...` | Cipher enum |
 | `CIPHER_NAMES: readonly CipherName[]` | Canonical name list |
 | `wrapperKeySize(cipher): number` / `wrapperNonceSize(cipher): number` | Cipher dimension accessors |
 | `wrapperGenerateKey(cipher): Uint8Array` | CSPRNG-fresh wrapper key |
