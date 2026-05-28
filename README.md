@@ -501,11 +501,9 @@ enc.setBitSoup(1);        // optional bit-level split ("bit-soup"; default: 0 = 
 enc.setLockSoup(1);       // optional Insane Interlocked Mode: per-chunk PRF-keyed
                           // bit-permutation overlay on top of bit-soup;
                           // auto-enabled for Single Ouroboros if setBitSoup(1) is on
-enc.setLockBatch(1);      // Lock Batch is the performance Lock Soup mode: recommended
-                          // in every case when the configured hash is PRF-grade, since
-                          // security is preserved under the PRF assumption while
-                          // throughput rises. Symmetric option — set identically on
-                          // the encrypt and decrypt sides.
+enc.setLockBatch(1);      // Recommended under the PRF assumption,
+                          // the performance Lock Soup mode.
+                          // Symmetric, set on both sides.
 
 // enc.setLockSeed(1);    // optional dedicated lockSeed for the bit-permutation
                           // derivation channel — separates that PRF's keying
@@ -571,7 +569,9 @@ dec.setNonceBits(512);
 dec.setBarrierFill(4);
 dec.setBitSoup(1);
 dec.setLockSoup(1);
-dec.setLockBatch(1);      // Recommended under the PRF assumption — the performance Lock Soup mode; symmetric, set on both sides.
+dec.setLockBatch(1);      // Recommended under the PRF assumption,
+                          // the performance Lock Soup mode.
+                          // Symmetric, set on both sides.
 
 // Restore PRF keys, seed components, MAC key, and the per-instance
 // configuration overrides (NonceBits / BarrierFill / BitSoup /
@@ -771,7 +771,9 @@ import { randomBytes } from 'node:crypto';
 // flags on every encrypt / decrypt call.
 setBitSoup(1);
 setLockSoup(1);
-setLockBatch(1);  // Recommended under the PRF assumption — the performance Lock Soup mode; symmetric, set on both sides.
+setLockBatch(1);  // Recommended under the PRF assumption,
+                  // the performance Lock Soup mode.
+                  // Symmetric, set on both sides.
 
 // Three Single-Ouroboros seeds and one MAC handle. Seeds are
 // CSPRNG-keyed; persistence-restore would use Seed.fromComponents.

@@ -82,7 +82,9 @@ import {
 using enc = new Encryptor('areion512', 1024, 'hmac-blake3', 1);
 enc.setNonceBits(512); enc.setBarrierFill(4);
 enc.setBitSoup(1); enc.setLockSoup(1);
-enc.setLockBatch(1);  // Recommended under the PRF assumption — the performance Lock Soup mode; symmetric, set on both sides.
+enc.setLockBatch(1);  // Recommended under the PRF assumption,
+                      // the performance Lock Soup mode.
+                      // Symmetric, set on both sides.
 
 const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
 
@@ -142,7 +144,9 @@ The "Alternative — User-Driven Loop" pattern: each chunk is one independent `e
 using enc = new Encryptor('areion512', 1024, null, 1);
 enc.setNonceBits(512); enc.setBarrierFill(4);
 enc.setBitSoup(1); enc.setLockSoup(1);
-enc.setLockBatch(1);  // Recommended under the PRF assumption — the performance Lock Soup mode; symmetric, set on both sides.
+enc.setLockBatch(1);  // Recommended under the PRF assumption,
+                      // the performance Lock Soup mode.
+                      // Symmetric, set on both sides.
 
 const outerKey = wrapperGenerateKey(Cipher.Aes128Ctr);
 using ww = new WrapStreamWriter(Cipher.Aes128Ctr, outerKey);
@@ -210,7 +214,9 @@ ITB Call: `enc.encrypt(plaintext)` returns one ITB blob. Wrap shape: `wrap` — 
 using enc = new Encryptor('areion512', 2048, null, 1);
 enc.setNonceBits(512); enc.setBarrierFill(4);
 enc.setBitSoup(1); enc.setLockSoup(1);
-enc.setLockBatch(1);  // Recommended under the PRF assumption — the performance Lock Soup mode; symmetric, set on both sides.
+enc.setLockBatch(1);  // Recommended under the PRF assumption,
+                      // the performance Lock Soup mode.
+                      // Symmetric, set on both sides.
 
 const encrypted = Buffer.from(enc.encrypt(plaintext));
 
@@ -235,7 +241,9 @@ ITB Call: `enc.encryptAuth` / `enc.decryptAuth`. Wrap shape: `wrap` (or `wrapInP
 using enc = new Encryptor('areion512', 2048, 'hmac-blake3', 1);
 enc.setNonceBits(512); enc.setBarrierFill(4);
 enc.setBitSoup(1); enc.setLockSoup(1);
-enc.setLockBatch(1);  // Recommended under the PRF assumption — the performance Lock Soup mode; symmetric, set on both sides.
+enc.setLockBatch(1);  // Recommended under the PRF assumption,
+                      // the performance Lock Soup mode.
+                      // Symmetric, set on both sides.
 
 const encrypted = Buffer.from(enc.encryptAuth(plaintext));
 
