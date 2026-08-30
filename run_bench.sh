@@ -1,33 +1,10 @@
 #!/usr/bin/env bash
 #
-# run_bench.sh -- canonical 4-pass bench runner for the Node.js /
-# TypeScript binding. Sequentially runs:
-#
-#   Pass 1: Single Ouroboros, ITB_LOCKSEED unset
-#   Pass 2: Triple Ouroboros, ITB_LOCKSEED unset
-#   Pass 3: Single Ouroboros, ITB_LOCKSEED=1
-#   Pass 4: Triple Ouroboros, ITB_LOCKSEED=1
-#
-# The bench harness is compiled and dispatched via the npm scripts
-# `bench:single` and `bench:triple` (each runs `node
-# dist-bench/bench/main.js single|triple` after a tsc compile pass).
-# Each pass walks 40 cases at the configured 5-second per-case
-# budget; total wall-clock ~30-40 minutes.
-#
-# Environment variables forwarded to the bench binary:
-#   ITB_NONCE_BITS    nonce width (128 / 256 / 512; default 128)
-#   ITB_BENCH_FILTER  substring match against bench-case names
-#   ITB_BENCH_MIN_SEC per-case wall-clock budget (default 5.0)
-#
-# `ITB_LOCKSEED` is managed by this script per pass.
-#
-# Usage:
-#   ./run_bench.sh                  # full 4-pass canonical sweep
-#   ./run_bench.sh single           # pass 1 + pass 3 only
-#   ./run_bench.sh triple           # pass 2 + pass 4 only
-#   ./run_bench.sh --no-lockseed    # pass 1 + pass 2 only
-#   ./run_bench.sh --lockseed-only  # pass 3 + pass 4 only
-#   ./run_bench.sh --wrapper-only   # only the wrapper bench (skip Single/Triple/LockSeed)
+# run_bench.sh -- bench runner for the Node.js / TypeScript binding.
+# Builds libitb.so + the binding via build.sh, points ITB_LIBITB_PATH
+# at the freshly-built shared library, then runs every bench script
+# (bench_message + bench_stream + bench_stream_one_shot) at
+# 1 / 16 / 64 MiB.
 
 set -eu
 set -o pipefail
@@ -36,75 +13,49 @@ cd "$(dirname "$0")"
 REPO_ROOT="$(cd ../.. && pwd)"
 DIST_DIR="$REPO_ROOT/dist/linux-amd64"
 
-if [[ ! -f "$DIST_DIR/libitb.so" ]]; then
-    echo "error: libitb.so not found at $DIST_DIR" >&2
-    echo "       run ./build.sh first" >&2
-    exit 1
+./build.sh
+
+export ITB_LIBITB_PATH="$DIST_DIR/libitb.so"
+
+# Bench-hostile Go runtime defaults are capped at libitb load time
+# via env vars so a bench crash before the benches' own
+# setMemoryLimit / setGCPercent calls still runs under a bounded
+# heap. The benches themselves reassert these via the API for
+# self-contained reproducibility.
+export ITB_GOMEMLIMIT="${ITB_GOMEMLIMIT:-512MiB}"
+export ITB_GOGC="${ITB_GOGC:-20}"
+
+# Bench-shape defaults — match the root Go BENCH3.md pin so the
+# throughput numbers are directly comparable to the shipped Go
+# baseline. Override any of these before calling the script to
+# change the shape. ITB_PROFILE stays unset by default: each bench
+# script applies its own shape default (Message:
+# singlemsg-triple-nomac-v1 / Stream: streaming-noaead-triple-v1).
+export ITB_NONCE_BITS="${ITB_NONCE_BITS:-512}"
+export ITB_KEY_BITS="${ITB_KEY_BITS:-1024}"
+export ITB_WITH_PARALLAX="${ITB_WITH_PARALLAX:-false}"
+export ITB_WITH_WRAPPER="${ITB_WITH_WRAPPER:-false}"
+export ITB_INNER_HASH="${ITB_INNER_HASH:-areion512}"
+export ITB_BENCH_MIN_SEC="${ITB_BENCH_MIN_SEC:-5}"
+
+# ITB_WITH_MAC=true derives MAC/AEAD profile counterparts. When
+# ITB_PROFILE is set explicitly by the caller, it wins over the
+# derivation and applies to both shapes (expert override).
+: "${ITB_WITH_MAC:=false}"
+if [ -n "${ITB_PROFILE:-}" ]; then
+    ITB_MSG_PROFILE_DEFAULT="${ITB_PROFILE}"
+    ITB_STREAM_PROFILE_DEFAULT="${ITB_PROFILE}"
+elif [ "${ITB_WITH_MAC}" = "true" ]; then
+    ITB_MSG_PROFILE_DEFAULT="singlemsg-triple-mac-v1"
+    ITB_STREAM_PROFILE_DEFAULT="streaming-aead-triple-mac-v1"
+else
+    ITB_MSG_PROFILE_DEFAULT="singlemsg-triple-nomac-v1"
+    ITB_STREAM_PROFILE_DEFAULT="streaming-noaead-triple-v1"
 fi
 
-if [[ ! -d node_modules ]]; then
-    echo "error: node_modules missing; run ./build.sh first" >&2
-    exit 1
-fi
-
-export LD_LIBRARY_PATH="$DIST_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-
-run_single=1
-run_triple=1
-run_no_lockseed=1
-run_with_lockseed=1
-wrapper_only=0
-case "${1:-}" in
-    single)            run_triple=0;;
-    triple)            run_single=0;;
-    --no-lockseed)     run_with_lockseed=0;;
-    --lockseed-only)   run_no_lockseed=0;;
-    --wrapper-only)    wrapper_only=1;;
-    -h|--help)         sed -n '3,31p' "$0"; exit 0;;
-    "")                ;;
-    *)                 echo "unknown option: $1" >&2; exit 2;;
-esac
-
-if [[ $wrapper_only -eq 1 ]]; then
-    echo
-    echo "===================================================================="
-    echo "  Wrapper only -- format-deniability bench (skip Single/Triple/LockSeed)"
-    echo "===================================================================="
-    unset ITB_LOCKSEED
-    npm run bench:build
-    exec node dist-bench/bench/bench-wrapper.js
-fi
-
-run_pass() {
-    local label="$1"
-    local arm="$2"
-    local lockseed="$3"
-    echo
-    echo "===================================================================="
-    echo "  $label"
-    echo "===================================================================="
-    if [[ "$lockseed" == "1" ]]; then
-        ITB_LOCKSEED=1 npm run "bench:$arm"
-    else
-        unset ITB_LOCKSEED
-        npm run "bench:$arm"
-    fi
-}
-
-if [[ $run_no_lockseed -eq 1 && $run_single -eq 1 ]]; then
-    run_pass "Pass 1 / 4 -- Single, ITB_LOCKSEED=off" single 0
-fi
-if [[ $run_no_lockseed -eq 1 && $run_triple -eq 1 ]]; then
-    run_pass "Pass 2 / 4 -- Triple, ITB_LOCKSEED=off" triple 0
-fi
-if [[ $run_with_lockseed -eq 1 && $run_single -eq 1 ]]; then
-    run_pass "Pass 3 / 4 -- Single, ITB_LOCKSEED=on" single 1
-fi
-if [[ $run_with_lockseed -eq 1 && $run_triple -eq 1 ]]; then
-    run_pass "Pass 4 / 4 -- Triple, ITB_LOCKSEED=on" triple 1
-fi
-
-echo
-echo "===================================================================="
-echo "  bench passes complete -- update bench/BENCH.md by hand"
-echo "===================================================================="
+npm run bench:build
+export ITB_PROFILE="${ITB_MSG_PROFILE_DEFAULT}"
+node dist-bench/benches/bench_message.js
+export ITB_PROFILE="${ITB_STREAM_PROFILE_DEFAULT}"
+node dist-bench/benches/bench_stream.js
+node dist-bench/benches/bench_stream_one_shot.js
