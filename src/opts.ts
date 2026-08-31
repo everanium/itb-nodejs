@@ -64,6 +64,21 @@ export class Opts {
     return this.withRaw('innerHash', name);
   }
 
+  /**
+   * Comma-joins an 8-slot per-call inner-hash constellation into the
+   * `innerHashes` opts key. Parallel to the Go-side
+   * `Opts.MixedHashes [8]string` per-call override; slot ordering is
+   * `[noise, lock, data1, data2, data3, start1, start2, start3]`.
+   *
+   * Fail-fast validation surfaces at Init on the Go side; a typo'd
+   * slot or width mismatch surfaces with an error naming the
+   * offending slot. When both this and `withInnerHash` are set, the
+   * mixed override wins on the Go side.
+   */
+  withInnerHashes(names: readonly string[]): this {
+    return this.withRaw('innerHashes', names.join(','));
+  }
+
   withOuterCipher(name: string): this {
     return this.withRaw('outerCipher', name);
   }

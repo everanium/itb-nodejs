@@ -84,3 +84,27 @@ test('opaque primitive name relay', () => {
   const status = statusOf(() => Pipeline.init('singlemsg-triple-mac-v1', opts));
   assert.notEqual(status, Status.Ok);
 });
+
+test('per-call innerHashes override round-trips', () => {
+  // The single-primitive width-512 base profile takes an 8-slot
+  // per-call MixedHashes override (Go-side Opts.MixedHashes, wired
+  // through the innerHashes= opts key). Round-trip proves the typed
+  // helper's comma-join lands in the Go parser correctly.
+  const mix = [
+    'areion512', 'blake2b512', 'areion512', 'blake2b512',
+    'areion512', 'blake2b512', 'areion512', 'blake2b512',
+  ];
+  const senderOpts = new Opts().withInnerHashes(mix);
+  const receiverOpts = new Opts().withInnerHashes(mix);
+  const sender = Pipeline.init('singlemsg-triple-mac-v1', senderOpts);
+  const receiver = Pipeline.open(
+    'singlemsg-triple-mac-v1',
+    sender.blob,
+    receiverOpts,
+  );
+  const plain = Buffer.from('per-call inner-hashes override round-trip payload');
+  const wire = sender.encryptMessage(plain);
+  assert.deepEqual(receiver.decryptMessage(wire), plain);
+  sender.free();
+  receiver.free();
+});
