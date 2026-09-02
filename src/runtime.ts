@@ -5,7 +5,7 @@ import { ItbError } from './error.js';
 import { Status } from './status.js';
 
 /** Binding package version, reported by the eitb CLI. */
-export const bindingVersion = '0.3.1';
+export const bindingVersion = '0.3.2';
 
 const decoder = new TextDecoder('utf-8');
 
