@@ -17,7 +17,7 @@ test('free mid-flight then reuse pipeline', () => {
   sess.free();
 
   // The Pipeline stays usable after the cancelled session.
-  const receiver = Pipeline.open('streaming-aead-triple-mac-v1', sender.blob, opts);
+  const receiver = Pipeline.load(sender.save());
   const wire = sender.encryptMessage(Buffer.from('after cancel'));
   assert.deepEqual(receiver.decryptMessage(wire), Buffer.from('after cancel'));
 

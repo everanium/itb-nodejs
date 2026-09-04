@@ -1,11 +1,11 @@
-// Error-mapping surface: opaque-string relay, closed Pipeline,
-// duplicate profile registration (with an 8-entry `innerHashes`
-// constellation).
+// Error-mapping surface: opaque-string relay, unknown profile, closed
+// Pipeline, profile registration from a JSON record (with an 8-entry
+// `hashes` constellation), duplicate registration.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { ItbError, Opts, Pipeline, Status, registerProfile } from '../src/index.js';
+import { ItbError, Opts, Pipeline, Status, inspect, lookup, profiles, register } from '../src/index.js';
 
 function statusOf(fn: () => unknown): number {
   try {
@@ -17,13 +17,13 @@ function statusOf(fn: () => unknown): number {
   assert.fail('expected an ItbError to be thrown');
 }
 
-test('unknown profile is BadInput with diagnostic', () => {
+test('unknown profile is UnknownProfile with diagnostic', () => {
   try {
     Pipeline.init('no-such-profile');
     assert.fail('init must throw');
   } catch (e) {
     assert.ok(e instanceof ItbError);
-    assert.equal(e.status, Status.BadInput);
+    assert.equal(e.status, Status.UnknownProfile);
     assert.ok(e.message.length > 0);
   }
 });
@@ -48,23 +48,27 @@ test('closed pipeline reports TripleClosed', () => {
   p.free();
 });
 
-test('register profile mixed then duplicate', () => {
-  // 8-entry width-256 innerHashes constellation, layers off.
-  const opts = new Opts()
-    .withRaw('mode', 'singlemsg-nomac')
-    .withRaw('width', '256')
-    .withRaw(
-      'innerHashes',
-      'blake3,blake2s,areion256,blake2b256,chacha20,blake3,blake2s,areion256',
-    )
-    .withRaw('keyBits', '1024')
-    .withRaw('parallaxOn', 'false')
-    .withRaw('wrapperOn', 'false');
-  registerProfile('nodejs-binding-test-mixed', opts);
+test('register mixed then duplicate', () => {
+  // 8-entry width-256 hashes constellation, layers off.
+  const profile = {
+    mode: 'singlemsg-nomac',
+    width: 256,
+    hashes: [
+      'blake3', 'blake2s', 'areion256', 'blake2b256',
+      'chacha20', 'blake3', 'blake2s', 'areion256',
+    ],
+    keybits: 1024,
+    parallax: false,
+    wrapper: false,
+  };
+  register('nodejs-binding-test-mixed', profile);
 
-  // The registered profile round-trips.
+  // The registered profile round-trips and is visible in the
+  // catalogue.
+  assert.ok(profiles().includes('nodejs-binding-test-mixed'));
+  assert.deepEqual(lookup('nodejs-binding-test-mixed').hashes, profile.hashes);
   const sender = Pipeline.init('nodejs-binding-test-mixed');
-  const receiver = Pipeline.open('nodejs-binding-test-mixed', sender.blob);
+  const receiver = Pipeline.load(sender.save());
   const wire = sender.encryptMessage(Buffer.from('custom profile'));
   assert.deepEqual(receiver.decryptMessage(wire), Buffer.from('custom profile'));
   sender.free();
@@ -72,8 +76,15 @@ test('register profile mixed then duplicate', () => {
 
   // Duplicate name is a distinct status.
   assert.equal(
-    statusOf(() => registerProfile('nodejs-binding-test-mixed', opts)),
+    statusOf(() => register('nodejs-binding-test-mixed', profile)),
     Status.ProfileExists,
+  );
+
+  // Strict record decode on the Go side: an unknown key is rejected
+  // there, not by the binding.
+  assert.equal(
+    statusOf(() => register('nodejs-binding-test-badkey', '{"mode":"singlemsg-nomac","bogus":1}')),
+    Status.BadInput,
   );
 });
 
@@ -88,20 +99,16 @@ test('opaque primitive name relay', () => {
 test('per-call innerHashes override round-trips', () => {
   // The single-primitive width-512 base profile takes an 8-slot
   // per-call MixedHashes override (Go-side Opts.MixedHashes, wired
-  // through the innerHashes= opts key). Round-trip proves the typed
-  // helper's comma-join lands in the Go parser correctly.
+  // through the innerHashes= opts key). The override lands in the
+  // blob's profile record, so the receiver loads with no opts.
   const mix = [
     'areion512', 'blake2b512', 'areion512', 'blake2b512',
     'areion512', 'blake2b512', 'areion512', 'blake2b512',
   ];
   const senderOpts = new Opts().withInnerHashes(mix);
-  const receiverOpts = new Opts().withInnerHashes(mix);
   const sender = Pipeline.init('singlemsg-triple-mac-v1', senderOpts);
-  const receiver = Pipeline.open(
-    'singlemsg-triple-mac-v1',
-    sender.blob,
-    receiverOpts,
-  );
+  assert.deepEqual(inspect(sender.save()).hashes, mix);
+  const receiver = Pipeline.load(sender.save());
   const plain = Buffer.from('per-call inner-hashes override round-trip payload');
   const wire = sender.encryptMessage(plain);
   assert.deepEqual(receiver.decryptMessage(wire), plain);

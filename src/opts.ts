@@ -8,8 +8,9 @@
 
 /**
  * Builder producing the URL-query-encoded opts string consumed by
- * `Pipeline.init`, `Pipeline.open`, and `registerProfile`. Fluent —
- * every setter mutates and returns the same instance.
+ * `Pipeline.init`. Fluent — every setter mutates and returns the same
+ * instance. (Profile registration takes a JSON record — see
+ * `register` — not an `Opts`.)
  */
 export class Opts {
   private readonly pairs: Array<[string, string]> = [];
@@ -90,8 +91,7 @@ export class Opts {
 
   /**
    * Escape hatch appending a raw `key=value` pair. Covers every key
-   * the Go side accepts, including the register-profile grammar
-   * (`mode`, `width`, `innerHashes`, `parallaxOn`, `wrapperOn`, …).
+   * the Go side accepts.
    */
   withRaw(key: string, value: string): this {
     this.pairs.push([key, value]);

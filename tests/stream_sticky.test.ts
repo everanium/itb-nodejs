@@ -16,7 +16,7 @@ import { ItbError, Opts, Pipeline, Status } from '../src/index.js';
 test('tampered wire sticky failure', () => {
   const opts = new Opts();
   const sender = Pipeline.init('streaming-aead-triple-mac-v1', opts);
-  const receiver = Pipeline.open('streaming-aead-triple-mac-v1', sender.blob, opts);
+  const receiver = Pipeline.load(sender.save());
 
   const plain = Buffer.alloc(65_536);
   for (let i = 0; i < plain.length; i++) {

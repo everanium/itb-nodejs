@@ -27,7 +27,7 @@ test('incremental tiny batches', () => {
   // Small chunk size so the 64 KiB payload spans many chunks.
   const opts = new Opts().withChunkSize(4096);
   const sender = Pipeline.init('streaming-aead-triple-mac-v1', opts);
-  const receiver = Pipeline.open('streaming-aead-triple-mac-v1', sender.blob, opts);
+  const receiver = Pipeline.load(sender.save());
 
   const plain = Buffer.alloc(65_536);
   for (let i = 0; i < plain.length; i++) {

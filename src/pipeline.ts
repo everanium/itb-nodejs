@@ -1,4 +1,5 @@
-// Handle-lifetime wrapper around the Triple Pipeline.
+// Handle-lifetime wrapper around the Triple Pipeline plus the
+// profile-catalogue entries (inspect / register / lookup / profiles).
 
 import {
   type Handle,
@@ -9,17 +10,27 @@ import {
   ITB_Triple_EncryptStream,
   ITB_Triple_Free,
   ITB_Triple_Init,
-  ITB_Triple_Open,
-  ITB_Triple_RegisterProfile,
+  ITB_Triple_Inspect,
+  ITB_Triple_Load,
+  ITB_Triple_LoadF,
+  ITB_Triple_Lookup,
+  ITB_Triple_MaxWorkers,
+  ITB_Triple_Profiles,
+  ITB_Triple_Register,
   ITB_Triple_Rekey,
+  ITB_Triple_Save,
+  ITB_Triple_SaveF,
 } from './ffi.js';
-import { ItbError, check } from './error.js';
+import { check } from './error.js';
 import { Opts } from './opts.js';
 import { Status } from './status.js';
 import { DecryptStream, EncryptStream } from './stream.js';
 
-/** Floor capacity for blob output buffers (Init / Rekey). */
+/** Floor capacity for blob output buffers (Init / Save / Rekey). */
 const BLOB_CAP = 64 * 1024;
+
+/** Floor capacity for profile-JSON output buffers (Inspect / Lookup / Profiles). */
+const JSON_CAP = 4 * 1024;
 
 /**
  * Pre-allocation formula for Message / one-shot stream outputs:
@@ -42,8 +53,8 @@ function retryOnce(
   const len: [number | bigint] = [0];
   let rc = call(buf, len);
   // Retry only when the reported length strictly exceeds the current
-  // capacity — pattern P1 in the fleet audit. Return a right-sized
-  // copy so the caller does not pin the pre-allocation slack.
+  // capacity. Return a right-sized copy so the caller does not pin
+  // the pre-allocation slack.
   if (rc === Status.BufferTooSmall && Number(len[0]) > cap) {
     buf = new Uint8Array(Number(len[0]));
     rc = call(buf, len);
@@ -76,14 +87,20 @@ type CipherFn = (
   outLen: [number | bigint],
 ) => number;
 
+/** Optional `(perm, wrap)` master pair for [Pipeline.load] / [Pipeline.loadF]. */
+export interface Masters {
+  perm: Uint8Array;
+  wrap: Uint8Array;
+}
+
 /**
- * A Triple Pipeline session plus its exported blob bytes.
+ * A Triple Pipeline session.
  *
- * The blob carries the session bundle the receiver feeds to
- * [Pipeline.open]; [Pipeline.rekey] refreshes it. Release the handle
- * deterministically via [Symbol.dispose] (`using` declarations) or
- * `free()`; a FinalizationRegistry backstop frees on GC (libitb
- * zeroes key material internally).
+ * [Pipeline.save] returns the serialised session blob the receiver
+ * feeds to [Pipeline.load]; [Pipeline.rekey] refreshes it. Release
+ * the handle deterministically via [Symbol.dispose] (`using`
+ * declarations) or `free()`; a FinalizationRegistry backstop frees
+ * on GC (libitb zeroes key material internally).
  *
  * Streaming-decrypt caveat: chunked Streaming AEAD verifies per
  * chunk, so plaintext of verified chunks is released before a later
@@ -92,50 +109,40 @@ type CipherFn = (
 export class Pipeline implements Disposable {
   /** @internal */
   _handle: Handle = 0;
-  private _blob: Buffer;
 
-  private constructor(handle: Handle, blob: Buffer) {
+  private constructor(handle: Handle) {
     this._handle = handle;
-    this._blob = blob;
     finalizer.register(this, handle, this);
   }
 
   /**
-   * Constructs a fresh Pipeline against the named profile. On a
+   * Constructs a fresh Pipeline against the named profile. The
+   * session blob is available through [Pipeline.save]. On a
    * blob-buffer retry the Init re-runs and yields a fresh session
    * (the undersized attempt is closed by libitb before returning).
    */
   static init(profile: string, opts: Opts = new Opts()): Pipeline {
     const optsStr = opts.build();
     const handle: [Handle] = [0];
-    const blob = retryOnce(BLOB_CAP, (buf, len) =>
+    retryOnce(BLOB_CAP, (buf, len) =>
       ITB_Triple_Init(profile, optsStr, buf, buf.length, len, handle),
     );
-    return new Pipeline(handle[0]!, blob);
+    return new Pipeline(handle[0]!);
   }
 
   /**
-   * Reconstructs a Pipeline from a blob produced by [Pipeline.init]
-   * or [Pipeline.rekey]. `masters` is undefined to use the
-   * blob-embedded masters, or `{ perm, wrap }` to override them.
+   * Reconstructs a Pipeline from a blob produced by [Pipeline.save]
+   * or [Pipeline.rekey]. The blob's embedded profile record is the
+   * sole structural source — no profile name, no opts. `masters` is
+   * undefined to use the blob-embedded masters, or `{ perm, wrap }`
+   * to override them.
    */
-  static open(
-    profile: string,
-    blob: Uint8Array,
-    opts: Opts = new Opts(),
-    masters?: { perm: Uint8Array; wrap: Uint8Array },
-  ): Pipeline {
-    if (masters && (masters.perm.length === 0 || masters.wrap.length === 0)) {
-      throw new ItbError(Status.BadInput, 'master overrides must be non-empty');
-    }
-    const optsStr = opts.build();
+  static load(blob: Uint8Array, masters?: Masters): Pipeline {
     const handle: [Handle] = [0];
     check(
-      ITB_Triple_Open(
-        profile,
-        blob,
+      ITB_Triple_Load(
+        blob.length > 0 ? blob : null,
         blob.length,
-        optsStr,
         masters ? masters.perm : null,
         masters ? masters.perm.length : 0,
         masters ? masters.wrap : null,
@@ -144,21 +151,56 @@ export class Pipeline implements Disposable {
         handle,
       ),
     );
-    return new Pipeline(handle[0]!, Buffer.from(blob));
-  }
-
-  /** The exported session bundle bytes for the receiver side. */
-  get blob(): Buffer {
-    return this._blob;
+    return new Pipeline(handle[0]!);
   }
 
   /**
-   * Rotates the parallax + wrapper masters and refreshes [blob].
-   * Must not run concurrently with cipher calls or open stream
-   * sessions on the same Pipeline.
+   * [Pipeline.load] for a blob stored in a file; the file is read
+   * inside the library.
    */
-  rekey(perm: Uint8Array, wrap: Uint8Array): void {
-    this._blob = retryOnce(Math.max(BLOB_CAP, this._blob.length), (buf, len) =>
+  static loadF(path: string, masters?: Masters): Pipeline {
+    const handle: [Handle] = [0];
+    check(
+      ITB_Triple_LoadF(
+        path,
+        masters ? masters.perm : null,
+        masters ? masters.perm.length : 0,
+        masters ? masters.wrap : null,
+        masters ? masters.wrap.length : 0,
+        masters ? 2 : 0,
+        handle,
+      ),
+    );
+    return new Pipeline(handle[0]!);
+  }
+
+  /**
+   * The current serialised session blob — the bytes `init` produced,
+   * the bytes `load` re-marshalled, or the bytes of the latest
+   * [rekey].
+   */
+  save(): Buffer {
+    return retryOnce(BLOB_CAP, (buf, len) =>
+      ITB_Triple_Save(this._handle, buf, buf.length, len),
+    );
+  }
+
+  /**
+   * Writes the current session blob to `path` inside the library
+   * (mode 0600; the containing directory must exist).
+   */
+  saveF(path: string): void {
+    check(ITB_Triple_SaveF(this._handle, path));
+  }
+
+  /**
+   * Rotates the parallax + wrapper masters and returns the refreshed
+   * session blob (also observable through [save]). Must not run
+   * concurrently with cipher calls or open stream sessions on the
+   * same Pipeline.
+   */
+  rekey(perm: Uint8Array, wrap: Uint8Array): Buffer {
+    return retryOnce(BLOB_CAP, (buf, len) =>
       ITB_Triple_Rekey(
         this._handle,
         perm,
@@ -170,6 +212,16 @@ export class Pipeline implements Disposable {
         len,
       ),
     );
+  }
+
+  /**
+   * Sets the worker cap for every subsequent cipher call. `n` is
+   * clamped, never rejected: `n <= 0` selects auto (`runtime.NumCPU`),
+   * `1..256` pins the cap, larger values are treated as 256. The cap
+   * is per-machine tuning and is never written to the blob.
+   */
+  maxWorkers(n: number): void {
+    check(ITB_Triple_MaxWorkers(this._handle, n));
   }
 
   /**
@@ -265,15 +317,69 @@ export class Pipeline implements Disposable {
 }
 
 /**
- * Registers a user-defined Triple profile under `name` so subsequent
- * [Pipeline.init] / [Pipeline.open] calls resolve it. The opts follow
- * the register-profile grammar validated by Go (`mode`, `width`,
- * `innerHash` / `innerHashes`, `keyBits`, `macName`, `outerCipher`,
- * `parallaxPalette`, `parallaxSegmentSize`, `chunkSize`,
- * `parallaxOn`, `wrapperOn`) — build them with [Opts.withRaw] plus
- * the typed setters where key names coincide. A duplicate name fails
- * with [Status.ProfileExists].
+ * Profile record — the JSON object libitb emits from [inspect] /
+ * [lookup] and accepts in [register]. Keys: `name`, `mode`, `width`,
+ * `hash`, `hashes`, `keybits`, `mac`, `tagstub`, `chunk`, `wrapper`,
+ * `outer`, `parallax`, `palette`, `segment`; absent keys are optional
+ * fields at their zero value.
  */
-export function registerProfile(name: string, opts: Opts = new Opts()): void {
-  check(ITB_Triple_RegisterProfile(name, opts.build()));
+export interface Profile {
+  name?: string;
+  mode: string;
+  width: number;
+  hash?: string;
+  hashes?: string[];
+  keybits: number;
+  mac?: string;
+  tagstub?: number;
+  chunk?: number;
+  wrapper: boolean;
+  outer?: string;
+  parallax: boolean;
+  palette?: string[];
+  segment?: number;
+}
+
+/** Shared body for the JSON-returning catalogue entries. */
+function jsonOut<T>(call: (buf: Uint8Array, len: [number | bigint]) => number): T {
+  return JSON.parse(retryOnce(JSON_CAP, call).toString('utf8')) as T;
+}
+
+/**
+ * Decodes the blob's embedded profile record without opening a
+ * Pipeline. No registry read, no primitive probe — a primitive name
+ * the local build lacks is returned unchanged.
+ */
+export function inspect(blob: Uint8Array): Profile {
+  return jsonOut<Profile>((buf, len) =>
+    ITB_Triple_Inspect(blob.length > 0 ? blob : null, blob.length, buf, buf.length, len),
+  );
+}
+
+/**
+ * Registers a profile record under `name` so subsequent
+ * [Pipeline.init] / [lookup] calls resolve it. `profile` is the
+ * record object (the shape [inspect] returns) or an already-encoded
+ * JSON string; a `name` key inside it, if present, must be empty or
+ * equal to `name`. Validation (name pattern, reserved prefixes, field
+ * rules) is performed by libitb; a duplicate name fails with
+ * [Status.ProfileExists].
+ */
+export function register(name: string, profile: Profile | string): void {
+  const text = typeof profile === 'string' ? profile : JSON.stringify(profile);
+  check(ITB_Triple_Register(name, text));
+}
+
+/**
+ * The profile record registered under `name` (a shipped catalogue
+ * entry or a prior [register]). An unknown name fails with
+ * [Status.UnknownProfile].
+ */
+export function lookup(name: string): Profile {
+  return jsonOut<Profile>((buf, len) => ITB_Triple_Lookup(name, buf, buf.length, len));
+}
+
+/** The sorted list of every registered profile name. */
+export function profiles(): string[] {
+  return jsonOut<string[]>((buf, len) => ITB_Triple_Profiles(buf, buf.length, len));
 }

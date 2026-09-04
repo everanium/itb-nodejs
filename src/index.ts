@@ -10,15 +10,22 @@
 //
 //   import { Opts, Pipeline } from 'itb';
 //
-//   const opts = new Opts();
-//   const sender = Pipeline.init('singlemsg-triple-mac-v1', opts);
-//   const receiver = Pipeline.open('singlemsg-triple-mac-v1', sender.blob, opts);
+//   const sender = Pipeline.init('singlemsg-triple-mac-v1', new Opts());
+//   const receiver = Pipeline.load(sender.save());
 //   const wire = sender.encryptMessage(Buffer.from('hello'));
 //   const plain = receiver.decryptMessage(wire);
 
 export { ItbError } from './error.js';
 export { Opts } from './opts.js';
-export { Pipeline, registerProfile } from './pipeline.js';
+export {
+  type Masters,
+  Pipeline,
+  type Profile,
+  inspect,
+  lookup,
+  profiles,
+  register,
+} from './pipeline.js';
 export { bindingVersion, setGCPercent, setMemoryLimit, version } from './runtime.js';
 export { Status, statusLabel } from './status.js';
 export { DecryptStream, EncryptStream } from './stream.js';

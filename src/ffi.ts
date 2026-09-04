@@ -81,12 +81,31 @@ export const ITB_Triple_Init = lib.func(
     'uint8_t *blobOut, size_t blobCap, _Out_ size_t *blobLen, ' +
     '_Out_ uintptr_t *outHandle)',
 );
-export const ITB_Triple_Open = lib.func(
-  'int ITB_Triple_Open(const char *profile, ' +
-    'const uint8_t *blob, size_t blobLen, const char *opts, ' +
+export const ITB_Triple_Load = lib.func(
+  'int ITB_Triple_Load(const uint8_t *blob, size_t blobLen, ' +
     'const uint8_t *permMaster, size_t permMasterLen, ' +
     'const uint8_t *wrapMaster, size_t wrapMasterLen, ' +
     'size_t mastersCount, _Out_ uintptr_t *outHandle)',
+);
+export const ITB_Triple_LoadF = lib.func(
+  'int ITB_Triple_LoadF(const char *path, ' +
+    'const uint8_t *permMaster, size_t permMasterLen, ' +
+    'const uint8_t *wrapMaster, size_t wrapMasterLen, ' +
+    'size_t mastersCount, _Out_ uintptr_t *outHandle)',
+);
+export const ITB_Triple_Save = lib.func(
+  'int ITB_Triple_Save(uintptr_t handle, ' +
+    'uint8_t *blobOut, size_t blobCap, _Out_ size_t *blobLen)',
+);
+export const ITB_Triple_SaveF = lib.func(
+  'int ITB_Triple_SaveF(uintptr_t handle, const char *path)',
+);
+export const ITB_Triple_Inspect = lib.func(
+  'int ITB_Triple_Inspect(const uint8_t *blob, size_t blobLen, ' +
+    'uint8_t *jsonOut, size_t jsonCap, _Out_ size_t *jsonLen)',
+);
+export const ITB_Triple_MaxWorkers = lib.func(
+  'int ITB_Triple_MaxWorkers(uintptr_t handle, int n)',
 );
 export const ITB_Triple_Rekey = lib.func(
   'int ITB_Triple_Rekey(uintptr_t handle, ' +
@@ -105,8 +124,15 @@ export const ITB_Triple_DecryptStream = lib.func(`int ITB_Triple_DecryptStream${
 export const ITB_Triple_EncryptMessage = lib.func(`int ITB_Triple_EncryptMessage${CIPHER_SIG}`);
 export const ITB_Triple_DecryptMessage = lib.func(`int ITB_Triple_DecryptMessage${CIPHER_SIG}`);
 
-export const ITB_Triple_RegisterProfile = lib.func(
-  'int ITB_Triple_RegisterProfile(const char *name, const char *opts)',
+export const ITB_Triple_Register = lib.func(
+  'int ITB_Triple_Register(const char *name, const char *profileJSON)',
+);
+export const ITB_Triple_Lookup = lib.func(
+  'int ITB_Triple_Lookup(const char *name, ' +
+    'uint8_t *jsonOut, size_t jsonCap, _Out_ size_t *jsonLen)',
+);
+export const ITB_Triple_Profiles = lib.func(
+  'int ITB_Triple_Profiles(uint8_t *jsonOut, size_t jsonCap, _Out_ size_t *jsonLen)',
 );
 
 export const ITB_Triple_EncryptStreamBegin = lib.func(

@@ -36,7 +36,7 @@ test('message round trip every profile', () => {
   const opts = new Opts();
   for (const profile of PROFILES) {
     const sender = Pipeline.init(profile, opts);
-    const receiver = Pipeline.open(profile, sender.blob, opts);
+    const receiver = Pipeline.load(sender.save());
     for (const size of [4 * 1024, 256 * 1024]) {
       const plain = payload(size, size);
       const wire = sender.encryptMessage(plain);
