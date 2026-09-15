@@ -1,0 +1,53 @@
+{
+  "name": "libitb3",
+  "version": "0.5.1",
+  "description": "ITB Symmetric Cipher Construction with Ambiguity-Based Security - Node.js",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist dist-test dist-bench dist-eitb *.tsbuildinfo",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.test.json && node --test 'dist-test/tests/**/*.test.js'",
+    "bench:build": "tsc -p tsconfig.bench.json",
+    "eitb:build": "tsc -p tsconfig.eitb.json"
+  },
+  "license": "Apache-2.0",
+  "author": "Andrey Kuvshinov <andrew@encloud.blue>",
+  "homepage": "https://github.com/everanium/itb",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/everanium/itb.git"
+  },
+  "bugs": {
+    "url": "https://github.com/everanium/itb/issues"
+  },
+  "keywords": [
+    "cryptography",
+    "encryption",
+    "cipher",
+    "symmetric",
+    "aead"
+  ],
+  "dependencies": {
+    "koffi": "^2.16.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.3"
+  }
+}
