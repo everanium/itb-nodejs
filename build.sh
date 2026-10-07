@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 #
-# build.sh -- one-step build for the Node.js / TypeScript binding:
-# libitb3.so + npm install + TypeScript compile. Prerequisites (Go,
-# Node.js >= 22, npm) must be installed separately; see README.md
-# "Prerequisites" section.
+# One-step build for the Node.js / TypeScript binding: libitb3.so +
+# npm install + TypeScript compile. Prerequisites (Go, Node.js >= 22,
+# npm) must be installed separately; see README.md "Prerequisites"
+# section.
 #
 # Every artefact this binding owns is removed before the build, so
-# nothing in the tree predates the invocation. The eitb entry point is
-# compiled here as well, not left to the launcher's on-demand path.
+# nothing in the tree predates the invocation. The eitb and loop entry
+# points are compiled here as well, not left to a launcher's on-demand
+# path.
 #
 # Usage:
 #   ./build.sh             # default build (full asm stack)
@@ -104,6 +105,7 @@ else
     clean_target 'dist-test'
     clean_target 'dist-bench'
     clean_target 'dist-eitb'
+    clean_target 'dist-loop'
     if [[ "${ITB_KEEP_DOWNLOADS:-0}" == "1" ]]; then
         echo "[clean] ITB_KEEP_DOWNLOADS=1: keeping node_modules/ and package-lock.json (weaker guarantee)"
         # The compiler state files still go: they are produced here, not
@@ -131,6 +133,14 @@ npm run eitb:build
 
 if [[ ! -f dist-eitb/eitb/eitb.js ]]; then
     echo "build.sh: dist-eitb/eitb/eitb.js was not produced" >&2
+    exit 1
+fi
+
+echo "==> building the loop stress harness"
+npm run loop:build
+
+if [[ ! -f dist-loop/loop/main.js ]]; then
+    echo "build.sh: dist-loop/loop/main.js was not produced" >&2
     exit 1
 fi
 

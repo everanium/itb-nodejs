@@ -84,6 +84,10 @@ export class Opts {
     return this.withRaw('outerCipher', name);
   }
 
+  withDrbg(name: string): this {
+    return this.withRaw('drbg', name);
+  }
+
   /** Comma-joins the palette names (`parallaxPalette`). */
   withParallaxPalette(names: readonly string[]): this {
     return this.withRaw('parallaxPalette', names.join(','));

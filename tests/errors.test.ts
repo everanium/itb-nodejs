@@ -115,3 +115,29 @@ test('per-call innerHashes override round-trips', () => {
   sender.free();
   receiver.free();
 });
+
+test('unknown drbg is RecipePrimitiveUnknown', () => {
+  try {
+    Pipeline.init('singlemsg-triple-mac-v1', new Opts().withDrbg('nope'));
+    assert.fail('init must throw');
+  } catch (e) {
+    assert.ok(e instanceof ItbError);
+    assert.equal(e.status, Status.RecipePrimitiveUnknown);
+    assert.ok(e.message.includes('nope'));
+  }
+});
+
+test('drbg survives a register copy of an inspected record', () => {
+  // drbg is a recipe field: unlike the inspection-only keys, it stays
+  // in a registered copy of an inspected record.
+  const pipe = Pipeline.init('singlemsg-triple-mac-v1', new Opts().withDrbg('csprng'));
+  const record = inspect(pipe.save()) as unknown as Record<string, unknown>;
+  pipe.free();
+  const { name: _n, nonce_bits: _nb, barrier_fill: _bf, container_mode: _cm, ...recipe } = record;
+  void _n;
+  void _nb;
+  void _bf;
+  void _cm;
+  register('nodejs-binding-test-drbg-copy', JSON.stringify(recipe));
+  assert.equal(lookup('nodejs-binding-test-drbg-copy').drbg, 'csprng');
+});

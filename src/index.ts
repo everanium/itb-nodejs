@@ -8,7 +8,7 @@
 // through to Go for validation; the binding carries no ITB
 // construction logic of its own.
 //
-//   import { Opts, Pipeline } from 'itb';
+//   import { Opts, Pipeline } from 'libitb3';
 //
 //   const sender = Pipeline.init('singlemsg-triple-mac-v1', new Opts());
 //   const receiver = Pipeline.load(sender.save());
@@ -21,11 +21,22 @@ export {
   type Masters,
   Pipeline,
   type Profile,
+  hashNames,
   inspect,
   lookup,
   profiles,
   register,
 } from './pipeline.js';
-export { bindingVersion, setGCPercent, setMemoryLimit, version } from './runtime.js';
-export { Status, statusLabel } from './status.js';
+export {
+  bindingVersion,
+  drbgAutoTier,
+  poolStats,
+  poolStatsLen,
+  setGCPercent,
+  setGOMAXPROCS,
+  setMemoryLimit,
+  version,
+  writeHeapProfile,
+} from './runtime.js';
+export { Status } from './status.js';
 export { DecryptStream, EncryptStream } from './stream.js';

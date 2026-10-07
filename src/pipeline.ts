@@ -9,6 +9,7 @@ import {
   ITB_Triple_EncryptMessage,
   ITB_Triple_EncryptStream,
   ITB_Triple_Free,
+  ITB_Triple_HashNames,
   ITB_Triple_Init,
   ITB_Triple_Inspect,
   ITB_Triple_Load,
@@ -321,12 +322,12 @@ export class Pipeline implements Disposable {
  * [lookup] and accepts in [register]; absent keys are optional fields
  * at their zero value.
  *
- * `nonce_bits` and `barrier_fill` are inspection-only. They are not
- * part of the profile recipe: [inspect] reads them from the blob's
- * runtime globals snapshot, while [lookup] omits both because the
- * registry entry never carries them. libitb3 rejects a [register]
- * payload that carries either key, so drop both before registering
- * an inspected record.
+ * `nonce_bits`, `barrier_fill` and `container_mode` are
+ * inspection-only. They are not part of the profile recipe: [inspect]
+ * reads them from the blob's inner snapshot, while [lookup] omits them
+ * because the registry entry never carries them. libitb3 rejects a
+ * [register] payload that carries any of the keys, so drop them before
+ * registering an inspected record.
  */
 export interface Profile {
   name?: string;
@@ -339,6 +340,10 @@ export interface Profile {
   nonce_bits?: number;
   /** DRBG barrier fill margin; present only on an [inspect] record. */
   barrier_fill?: number;
+  /** Container floor sizing mode (1 per-region, 2 per-container); present only on an [inspect] record. */
+  container_mode?: number;
+  /** DRBG fill primitive name; absent when the auto tier applies. */
+  drbg?: string;
   mac?: string;
   tagstub?: number;
   chunk?: number;
@@ -391,4 +396,13 @@ export function lookup(name: string): Profile {
 /** The sorted list of every registered profile name. */
 export function profiles(): string[] {
   return jsonOut<string[]>((buf, len) => ITB_Triple_Profiles(buf, buf.length, len));
+}
+
+/**
+ * The shipped inner-hash registry as a list of primitive names, in
+ * registry order. Runtime-registered custom primitives are not part of
+ * this enumeration.
+ */
+export function hashNames(): string[] {
+  return jsonOut<string[]>((buf, len) => ITB_Triple_HashNames(buf, buf.length, len));
 }

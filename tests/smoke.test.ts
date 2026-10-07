@@ -1,4 +1,4 @@
-// Init → save → Load → encryptMessage → decryptMessage round trip.
+// Init → Save → Load → encryptMessage → decryptMessage round trip.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

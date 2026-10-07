@@ -1,11 +1,11 @@
-// eitb — command-line demonstrator for the ITB Node.js binding.
+// Command-line demonstrator for the ITB Node.js binding.
 //
 // Subcommands:
 //
-//   eitb version                                   library + binding versions
-//   eitb profiles                                  registered profile catalogue
-//   eitb inspect <blob-hex>                        profile record of a blob
-//   eitb encrypt <profile> <in-file> <out-file>    Single Message encrypt
+//   eitb version
+//   eitb profiles
+//   eitb inspect <blob-hex>
+//   eitb encrypt <profile> <in-file> <out-file>
 //   eitb decrypt <profile> <blob-hex> <in-file> <out-file>
 //
 // `encrypt` prints the session blob (Pipeline.save) to stderr as hex;
@@ -13,8 +13,9 @@
 // the session with Pipeline.load (the profile argument only routes
 // Single Message versus streaming). `profiles` lists the registered
 // profile catalogue one name per line; the profiles that carry a
-// cipher surface are the ones `encrypt` / `decrypt` accept. Argument
-// parsing is hand-rolled over process.argv.
+// cipher surface are the ones `encrypt` / `decrypt` accept. `inspect`
+// prints the profile record a blob carries. Argument parsing is
+// hand-rolled over process.argv.
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';

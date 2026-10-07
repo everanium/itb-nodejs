@@ -1,0 +1,9 @@
+# The utility's compiled form lands in the binding's own dist-loop/
+# tree, which the binding's ignore file already covers; this keeps any
+# output a future toolchain might drop beside the sources out of the
+# index even when the tree is consumed outside the repository root.
+*.js
+*.js.map
+*.d.ts
+*.d.ts.map
+*.tsbuildinfo

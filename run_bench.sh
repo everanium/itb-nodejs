@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# run_bench.sh -- bench runner for the Node.js / TypeScript binding.
-# Builds libitb3.so + the binding via build.sh, points ITB_LIBITB3_PATH
-# at the freshly-built shared library, then runs every bench script
-# (bench_message + bench_stream + bench_stream_one_shot) at
-# 1 / 16 / 64 MiB.
+# Bench runner for the Node.js / TypeScript binding. Builds libitb3.so
+# + the binding via build.sh, points ITB_LIBITB3_PATH at the
+# freshly-built shared library, then runs every bench script
+# (bench_message + bench_stream + bench_stream_one_shot) at 1 / 16 / 64
+# MiB.
 
 set -eu
 set -o pipefail
@@ -17,11 +17,9 @@ DIST_DIR="$REPO_ROOT/dist/linux-amd64"
 
 export ITB_LIBITB3_PATH="$DIST_DIR/libitb3.so"
 
-# Bench-hostile Go runtime defaults are capped at libitb3 load time
-# via env vars so a bench crash before the benches' own
-# setMemoryLimit / setGCPercent calls still runs under a bounded
-# heap. The benches themselves reassert these via the API for
-# self-contained reproducibility.
+# Go-runtime pacing defaults for bench-scale allocation churn; the
+# `:-` form respects any override set by the caller. The bench
+# scripts apply the same caps programmatically.
 export ITB_GOMEMLIMIT="${ITB_GOMEMLIMIT:-4GiB}"
 export ITB_GOGC="${ITB_GOGC:-100}"
 

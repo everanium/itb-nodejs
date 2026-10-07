@@ -20,11 +20,12 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "clean": "rm -rf dist dist-test dist-bench dist-eitb *.tsbuildinfo",
+    "clean": "rm -rf dist dist-test dist-bench dist-eitb dist-loop *.tsbuildinfo",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsc -p tsconfig.test.json && node --test 'dist-test/tests/**/*.test.js'",
     "bench:build": "tsc -p tsconfig.bench.json",
-    "eitb:build": "tsc -p tsconfig.eitb.json"
+    "eitb:build": "tsc -p tsconfig.eitb.json",
+    "loop:build": "tsc -p tsconfig.loop.json"
   },
   "license": "Apache-2.0",
   "author": "Andrey Kuvshinov <andrew@encloud.blue>",

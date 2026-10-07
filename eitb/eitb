@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# eitb -- launcher for the compiled eitb CLI. Compiles the TypeScript
-# sources on first use (or after a clean), then forwards every
-# argument to the Node.js entry point.
+# Launcher for the compiled eitb CLI. Compiles the TypeScript sources
+# on first use (or after a clean), then forwards every argument to
+# the Node.js entry point.
 
 set -eu
 set -o pipefail

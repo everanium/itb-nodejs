@@ -1,28 +1,22 @@
 // Error type shared by every fallible call in the binding.
 
 import { ITB_LastError } from './ffi.js';
-import { Status, statusLabel } from './status.js';
+import { Status } from './status.js';
 
 const decoder = new TextDecoder('utf-8');
 
 /**
  * Raised whenever libitb3 returns a non-OK status. `status` carries
- * the numeric code; the message appends the `ITB_LastError`
- * diagnostic captured immediately after the failing call
- * (process-global last-write-wins — under concurrent FFI use the
- * text may belong to a different call; the status code is always
- * attributable).
+ * the numeric code; the message is the `ITB_LastError` diagnostic
+ * captured immediately after the failing call (process-global
+ * last-write-wins — under concurrent FFI use the text may belong to
+ * a different call; the status code is always attributable).
  */
 export class ItbError extends Error {
   readonly status: number;
 
   constructor(status: number, detail?: string) {
-    const diag = detail ?? readLastError();
-    super(
-      diag.length > 0
-        ? `itb: status=${status} (${statusLabel(status)}): ${diag}`
-        : `itb: status=${status} (${statusLabel(status)})`,
-    );
+    super(`itb: status=${status}: ${detail ?? readLastError()}`);
     this.status = status;
     this.name = 'ItbError';
     Object.setPrototypeOf(this, new.target.prototype);

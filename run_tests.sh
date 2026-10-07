@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# run_tests.sh -- one-step test runner for the Node.js / TypeScript
-# binding. Builds libitb3.so + the binding via build.sh, points
-# ITB_LIBITB3_PATH at the freshly-built shared library, then invokes
-# `npm test`. Positional arguments are forwarded through to the npm
-# test script (e.g. a single compiled test file path).
+# One-step test runner for the Node.js / TypeScript binding. Builds
+# libitb3.so + the binding via build.sh, points ITB_LIBITB3_PATH at
+# the freshly-built shared library, then invokes `npm test`.
+# Positional arguments are forwarded through to the npm test script
+# (e.g. a single compiled test file path).
 #
 # Usage:
 #   ./run_tests.sh                                        # full suite

@@ -1,4 +1,4 @@
-// Stream one-shot throughput vs plaintext size. Times the
+// One-shot stream throughput vs plaintext size. Times the
 // whole-buffer path (a single FFI round trip through the Pipeline's
 // stream chain).
 //
@@ -58,6 +58,9 @@ function measure(label: string, sizeBytes: number, iter: () => void): void {
   );
 }
 
+// Bench-scale allocation churn grows the Go scratch heap
+// unboundedly without a soft memory cap + aggressive GC; the
+// return values report the previous settings, not an error.
 setMemoryLimit(4n * 1024n * 1024n * 1024n);
 setGCPercent(100);
 
