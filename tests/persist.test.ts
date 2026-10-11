@@ -101,15 +101,17 @@ test('inspect carries the recipe plus inspection-only fields', () => {
 test('the Profile type exposes the inspection-only fields', () => {
   // Typed access, no cast: dropping either member from the Profile
   // interface fails the `tsc` step `npm test` runs before the suite.
-  const pipe = Pipeline.init(PROFILE, new Opts().withNonceBits(256).withBarrierFill(4));
+  const pipe = Pipeline.init(PROFILE, new Opts().withMode(2).withNonceBits(256).withBarrierFill(4));
   const record: Profile = inspect(pipe.save());
   pipe.free();
+  assert.equal(record.container_mode, 2);
   assert.equal(record.nonce_bits, 256);
   assert.equal(record.barrier_fill, 4);
 
   // The registry entry is the recipe alone — neither field is part of
   // it, so both read as undefined rather than as zero.
   const registry: Profile = lookup(PROFILE);
+  assert.equal(registry.container_mode, undefined);
   assert.equal(registry.nonce_bits, undefined);
   assert.equal(registry.barrier_fill, undefined);
 
@@ -117,6 +119,7 @@ test('the Profile type exposes the inspection-only fields', () => {
   const plain = Pipeline.init(PROFILE);
   const defaults: Profile = inspect(plain.save());
   plain.free();
+  assert.equal(defaults.container_mode, 1);
   assert.equal(defaults.nonce_bits, 512);
   assert.equal(defaults.barrier_fill, 1);
 });

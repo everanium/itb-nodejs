@@ -561,29 +561,6 @@ function logPipelineInitialised(profile: string, blob: Uint8Array): void {
   );
 }
 
-/**
- * Sets the inner blob's "mode" field of a wrap-layer session blob to
- * targetMode (1 = per-region, 2 = per-container) and returns the
- * re-encoded blob. The wrap layer's profile record carries its own
- * "mode" (a string), so only the inner blob ("ib") is touched; every
- * other value survives the round trip unchanged (integers stay
- * integers, strings stay byte-identical) and no key is added.
- */
-function editInnerBlobMode(blob: Uint8Array, targetMode: number): Uint8Array {
-  const wrap: unknown = JSON.parse(new TextDecoder().decode(blob));
-  if (typeof wrap !== 'object' || wrap === null || Array.isArray(wrap)) {
-    throw new Error('wrap blob is not a JSON object');
-  }
-  const inner = (wrap as Record<string, unknown>)['ib'];
-  if (typeof inner !== 'object' || inner === null || Array.isArray(inner)) {
-    throw new Error('inner blob not found');
-  }
-  if (!('mode' in inner)) {
-    throw new Error('inner blob mode field not found');
-  }
-  (inner as Record<string, unknown>)['mode'] = targetMode;
-  return new TextEncoder().encode(JSON.stringify(wrap));
-}
 
 /**
  * Folds a keystream primitive into opts for any layer the named profile
@@ -653,6 +630,7 @@ function buildPipeline(
   profile: string,
 ): { pipe: Pipeline; blob: Uint8Array } | null {
   const opts = new Opts()
+    .withMode(cfg.blobMode)
     .withInnerHash(cfg.hash)
     .withMacName(cfg.mac)
     .withParallax(cfg.parallax)
@@ -688,25 +666,6 @@ function buildPipeline(
     errLine(`Save(${profile}): ${statusDetail(e)}`);
     pipe.free();
     return null;
-  }
-  if (cfg.blobMode === 2) {
-    // The sizing mode is not an Opts knob: the Init blob is edited and
-    // the pipeline reopened from it, so the retained blob (the one
-    // blob-cycle reopens from) carries the edited mode.
-    try {
-      blob = editInnerBlobMode(blob, 2);
-    } catch (e) {
-      errLine(`rewrite blob mode: ${errorSentence(e)}`);
-      pipe.free();
-      return null;
-    }
-    pipe.free();
-    try {
-      pipe = Pipeline.load(blob);
-    } catch (e) {
-      errLine(`reload Mode 2 blob: ${statusDetail(e)}`);
-      return null;
-    }
   }
   logPipelineInitialised(profile, blob);
   return { pipe, blob };

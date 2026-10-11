@@ -15,6 +15,11 @@
 export class Opts {
   private readonly pairs: Array<[string, string]> = [];
 
+  /** Overrides the container floor sizing mode: 1 (per-region, default) or 2 (per-container compact). */
+  withMode(n: number): this {
+    return this.withRaw('mode', String(n));
+  }
+
   /** Hex-encodes the parallax master override (`pm`). */
   withPermMaster(master: Uint8Array): this {
     return this.withRaw('pm', hex(master));

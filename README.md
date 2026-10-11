@@ -83,7 +83,7 @@ instance. The resolved shape is written into the blob, so the
 receiver loads it with no opts of its own:
 
 ```ts
-const opts = new Opts().withChunkSize(65536).withWrapper(false);
+const opts = new Opts().withMode(2).withChunkSize(65536).withWrapper(false);
 const sender = Pipeline.init('singlemsg-triple-mac-v1', opts);
 const receiver = Pipeline.load(sender.save());
 ```
