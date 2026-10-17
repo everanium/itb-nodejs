@@ -11,6 +11,7 @@ import {
   ITB_Triple_Free,
   ITB_Triple_HashNames,
   ITB_Triple_Init,
+  ITB_Triple_InitKeys,
   ITB_Triple_Inspect,
   ITB_Triple_Load,
   ITB_Triple_LoadF,
@@ -122,12 +123,62 @@ export class Pipeline implements Disposable {
    * blob-buffer retry the Init re-runs and yields a fresh session
    * (the undersized attempt is closed by libitb3 before returning).
    */
-  static init(profile: string, opts: Opts = new Opts()): Pipeline {
-    const optsStr = opts.build();
+  static init(profile: string, opts: Opts | string = new Opts()): Pipeline {
+    const optsStr = typeof opts === 'string' ? opts : opts.build();
     const handle: [Handle] = [0];
     retryOnce(BLOB_CAP, (buf, len) =>
       ITB_Triple_Init(profile, optsStr, buf, buf.length, len, handle),
     );
+    return new Pipeline(handle[0]!);
+  }
+
+  /**
+   * Deterministically constructs a Pipeline from eight caller-supplied
+   * master keys (one per canonical seed slot 0..7) against the named
+   * profile and options. The eight master keys must come from
+   * independent entropy or key-agreement sources; never derive all
+   * eight keys from a single secret or a single KDF parent key.
+   */
+  static initKeys(
+    profile: string,
+    masters: readonly Uint8Array[],
+    opts: Opts | string = new Opts(),
+  ): Pipeline {
+    const optsStr = typeof opts === 'string' ? opts : opts.build();
+    const count = masters.length;
+    let totalLen = 0;
+    const lens: number[] = [];
+    for (const m of masters) {
+      totalLen += m.byteLength;
+      lens.push(m.byteLength);
+    }
+    const flat = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const m of masters) {
+      if (m.byteLength > 0) {
+        flat.set(m, offset);
+        offset += m.byteLength;
+      }
+    }
+    const handle: [Handle] = [0];
+    try {
+      retryOnce(BLOB_CAP, (buf, len) =>
+        ITB_Triple_InitKeys(
+          profile,
+          optsStr,
+          totalLen > 0 ? flat : null,
+          totalLen,
+          count > 0 ? lens : null,
+          count,
+          buf,
+          buf.length,
+          len,
+          handle,
+        ),
+      );
+    } finally {
+      flat.fill(0);
+    }
     return new Pipeline(handle[0]!);
   }
 

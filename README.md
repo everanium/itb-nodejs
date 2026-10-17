@@ -13,7 +13,7 @@ is resolved and dispatched at module load. Every hash-name /
 MAC-name / cipher-name / profile-name is an opaque string passed
 through to Go for validation; the binding carries no ITB
 construction logic. The public surface is one `Pipeline` class
-(init / load / loadF / save / saveF / rekey / maxWorkers / close,
+(init / initKeys / load / loadF / save / saveF / rekey / maxWorkers / close,
 Single Message encrypt / decrypt, one-shot and incremental stream
 sessions with chunk-iterable pumps), an `Opts` query-string builder
 for `init`, the profile-catalogue functions (`inspect` / `register`
@@ -87,6 +87,8 @@ const opts = new Opts().withMode(2).withChunkSize(65536).withWrapper(false);
 const sender = Pipeline.init('singlemsg-triple-mac-v1', opts);
 const receiver = Pipeline.load(sender.save());
 ```
+
+`Pipeline.initKeys` constructs a `Pipeline` deterministically from eight caller-supplied master keys (one per seed slot `0..7`) via per-slot KDF, so two peers holding the same eight master keys derive identical `Pipeline` instances without exchanging a session blob. The eight master keys must come from independent entropy or key-agreement sources — never derive all eight keys from a single secret or a single KDF parent key.
 
 `Pipeline.rekey` rotates the parallax + wrapper masters mid-session
 (the eight ITB seeds and MAC key are fixed for the session lifetime

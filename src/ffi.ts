@@ -92,6 +92,13 @@ export const ITB_Triple_Init = lib.func(
     'uint8_t *blobOut, size_t blobCap, _Out_ size_t *blobLen, ' +
     '_Out_ uintptr_t *outHandle)',
 );
+export const ITB_Triple_InitKeys = lib.func(
+  'int ITB_Triple_InitKeys(const char *profile, const char *opts, ' +
+    'const uint8_t *mastersFlat, size_t mastersFlatLen, ' +
+    'const size_t *masterLens, size_t mastersCount, ' +
+    'uint8_t *blobOut, size_t blobCap, _Out_ size_t *blobLen, ' +
+    '_Out_ uintptr_t *outHandle)',
+);
 export const ITB_Triple_Load = lib.func(
   'int ITB_Triple_Load(const uint8_t *blob, size_t blobLen, ' +
     'const uint8_t *permMaster, size_t permMasterLen, ' +

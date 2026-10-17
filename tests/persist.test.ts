@@ -43,6 +43,25 @@ test('save / load round trip', () => {
   receiver.free();
 });
 
+test('initKeys determinism and error propagation', () => {
+  const masters = Array.from({ length: 8 }, (_, i) => Buffer.alloc(32, 0x11 * (i + 1)));
+  const p1 = Pipeline.initKeys(PROFILE, masters);
+  const p2 = Pipeline.initKeys(PROFILE, masters);
+  assert.deepEqual(p1.save(), p2.save());
+  const wire = p1.encryptMessage(Buffer.from('deterministic initKeys'));
+  assert.deepEqual(p2.decryptMessage(wire), Buffer.from('deterministic initKeys'));
+  p1.free();
+  p2.free();
+
+  const dupMasters = masters.slice();
+  dupMasters[1] = dupMasters[0]!;
+  assert.equal(statusOf(() => Pipeline.initKeys(PROFILE, dupMasters)), Status.BadInput);
+
+  const shortMasters = masters.slice();
+  shortMasters[0] = Buffer.alloc(8, 0x11);
+  assert.equal(statusOf(() => Pipeline.initKeys(PROFILE, shortMasters)), Status.BadInput);
+});
+
 test('saveF / loadF round trip', () => {
   const dir = mkdtempSync(join(tmpdir(), 'itb-nodejs-persist-'));
   try {
