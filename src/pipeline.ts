@@ -66,6 +66,37 @@ function retryOnce(
   return Buffer.from(buf.subarray(0, n));
 }
 
+/**
+ * Cold-path counterpart of [retryOnce] for session blobs (`init` /
+ * `initKeys` / `save` / `rekey`): zeroes the staging `Uint8Array`
+ * before release, and when `discard` is true skips allocating a
+ * `Buffer` copy.
+ */
+function retryOnceSecret(
+  cap: number,
+  call: (buf: Uint8Array, len: [number | bigint]) => number,
+  discard = false,
+): Buffer {
+  let buf = new Uint8Array(cap);
+  const len: [number | bigint] = [0];
+  try {
+    let rc = call(buf, len);
+    if (rc === Status.BufferTooSmall && Number(len[0]) > cap) {
+      buf.fill(0);
+      buf = new Uint8Array(Number(len[0]));
+      rc = call(buf, len);
+    }
+    check(rc);
+    if (discard) {
+      return Buffer.alloc(0);
+    }
+    const n = Number(len[0]);
+    return Buffer.from(buf.subarray(0, n));
+  } finally {
+    buf.fill(0);
+  }
+}
+
 function isZero(h: Handle): boolean {
   return h === 0 || h === 0n;
 }
@@ -126,8 +157,11 @@ export class Pipeline implements Disposable {
   static init(profile: string, opts: Opts | string = new Opts()): Pipeline {
     const optsStr = typeof opts === 'string' ? opts : opts.build();
     const handle: [Handle] = [0];
-    retryOnce(BLOB_CAP, (buf, len) =>
-      ITB_Triple_Init(profile, optsStr, buf, buf.length, len, handle),
+    retryOnceSecret(
+      BLOB_CAP,
+      (buf, len) =>
+        ITB_Triple_Init(profile, optsStr, buf, buf.length, len, handle),
+      true,
     );
     return new Pipeline(handle[0]!);
   }
@@ -162,19 +196,22 @@ export class Pipeline implements Disposable {
     }
     const handle: [Handle] = [0];
     try {
-      retryOnce(BLOB_CAP, (buf, len) =>
-        ITB_Triple_InitKeys(
-          profile,
-          optsStr,
-          totalLen > 0 ? flat : null,
-          totalLen,
-          count > 0 ? lens : null,
-          count,
-          buf,
-          buf.length,
-          len,
-          handle,
-        ),
+      retryOnceSecret(
+        BLOB_CAP,
+        (buf, len) =>
+          ITB_Triple_InitKeys(
+            profile,
+            optsStr,
+            totalLen > 0 ? flat : null,
+            totalLen,
+            count > 0 ? lens : null,
+            count,
+            buf,
+            buf.length,
+            len,
+            handle,
+          ),
+        true,
       );
     } finally {
       flat.fill(0);
@@ -232,7 +269,7 @@ export class Pipeline implements Disposable {
    * [rekey].
    */
   save(): Buffer {
-    return retryOnce(BLOB_CAP, (buf, len) =>
+    return retryOnceSecret(BLOB_CAP, (buf, len) =>
       ITB_Triple_Save(this._handle, buf, buf.length, len),
     );
   }
@@ -252,7 +289,7 @@ export class Pipeline implements Disposable {
    * same Pipeline.
    */
   rekey(perm: Uint8Array, wrap: Uint8Array): Buffer {
-    return retryOnce(BLOB_CAP, (buf, len) =>
+    return retryOnceSecret(BLOB_CAP, (buf, len) =>
       ITB_Triple_Rekey(
         this._handle,
         perm,
