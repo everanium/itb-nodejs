@@ -432,6 +432,8 @@ export interface Profile {
   container_mode?: number;
   /** DRBG fill primitive name; absent when the auto tier applies. */
   drbg?: string;
+  /** Interlocked Barrier chunk width (`"48"` or `"168"`); absent when the 48-bit default applies. */
+  interlock?: string;
   mac?: string;
   tagstub?: number;
   chunk?: number;

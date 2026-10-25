@@ -349,6 +349,7 @@ function emitJson(
     `,"blob_mode":${cfg.blobMode}` +
     `,"drbg":${jsonString(cfg.drbg)}` +
     `,"drbg_auto_tier":${jsonString(drbgAutoTier())}` +
+    `,"interlock":${jsonString(cfg.interlock)}` +
     `,"chunk_size_bytes":${cfg.chunkSize}` +
     `,"barrier_fill":${cfg.barrierFill}` +
     `,"parallax":"${onOff(cfg.parallax)}"` +

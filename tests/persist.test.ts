@@ -192,3 +192,26 @@ test('drbg is absent by default', () => {
   const looked = lookup(PROFILE) as unknown as Record<string, unknown>;
   assert.ok(!('drbg' in looked));
 });
+
+test('interlock 168 round trip, inspect, and bad input rejection', () => {
+  const sender = Pipeline.init(PROFILE, new Opts().withInterlock('168'));
+  const plain = Buffer.from('interlock 168 round trip');
+  const wire = sender.encryptMessage(plain);
+  assert.deepEqual(sender.decryptMessage(wire), plain);
+  const blob = sender.save();
+  const record: Profile = inspect(blob);
+  assert.equal(record.interlock, '168');
+  const receiver = Pipeline.load(blob);
+  assert.deepEqual(receiver.decryptMessage(wire), plain);
+  sender.free();
+  receiver.free();
+
+  assert.equal(
+    statusOf(() => Pipeline.init(PROFILE, new Opts().withInnerHash('blake3').withInterlock('168'))),
+    Status.BadInput,
+  );
+  assert.equal(
+    statusOf(() => Pipeline.init(PROFILE, new Opts().withInterlock('96'))),
+    Status.BadInput,
+  );
+});

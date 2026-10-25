@@ -139,6 +139,8 @@ const FLAGS: readonly FlagRow[] = [
     'concurrent workers (1..10); on runtimes without parallelism values above 1 are clamped to 1'],
   ['hash', 'string', Kind.Str, 'areion512',
     'inner ITB hash primitive name'],
+  ['interlock', 'string', Kind.Str, '',
+    'Interlocked Barrier chunk width: 48 | 168; empty = profile default (48; 168 requires 512-bit hash)'],
   ['iterations', 'int', Kind.Int64, 0,
     'fixed per-worker iteration count; 0 = duration-based'],
   ['json-output', '', Kind.Bool, false,
@@ -483,6 +485,13 @@ function parseFlags(argv: string[]): [number, Config] {
   }
   // Validated by Init: the C ABI enumerates no DRBG names.
   cfg.drbg = str('drbg');
+  cfg.interlock = str('interlock');
+  if (!['', '48', '168'].includes(cfg.interlock)) {
+    errLine(
+      `--interlock must be 48 | 168 (or empty = profile default), got "${cfg.interlock}"`,
+    );
+    return [-1, cfg];
+  }
   const chunkSize = parseSize(str('chunk-size'));
   if (chunkSize === null) {
     errLine(`--chunk-size: invalid size "${str('chunk-size')}"`);
@@ -557,7 +566,8 @@ function logPipelineInitialised(profile: string, blob: Uint8Array): void {
       `parallax=${onOff(record.parallax === true)} ` +
       `wrapper=${onOff(record.wrapper === true)}` +
       (record.container_mode === 2 ? ` container-mode=${record.container_mode}` : '') +
-      (record.drbg !== undefined && record.drbg !== '' ? ` drbg=${record.drbg}` : ''),
+      (record.drbg !== undefined && record.drbg !== '' ? ` drbg=${record.drbg}` : '') +
+      (record.interlock !== undefined && record.interlock !== '' ? ` interlock=${record.interlock}` : ''),
   );
 }
 
@@ -639,6 +649,7 @@ function buildPipeline(
     .withNonceBits(cfg.nonceBits)
     .withBarrierFill(cfg.barrierFill)
     .withDrbg(cfg.drbg)
+    .withInterlock(cfg.interlock)
     .withChunkSize(cfg.chunkSize);
   if (cfg.profile !== '') {
     const filled = fillKeystreamLayers(cfg.profile, opts, cfg.parallax, cfg.wrapper);
@@ -732,7 +743,8 @@ async function run(argv: string[]): Promise<number> {
       `payload-mode=${payloadModeName(cfg.payloadMode)} seed=${u64Dec(cfg.seed)} ` +
       `json-output=${cfg.jsonOutput ? 'true' : 'false'}` +
       (cfg.blobMode !== 1 ? ` blob-mode=${cfg.blobMode}` : '') +
-      (cfg.drbg !== '' ? ` drbg=${cfg.drbg}` : ''),
+      (cfg.drbg !== '' ? ` drbg=${cfg.drbg}` : '') +
+      (cfg.interlock !== '' ? ` interlock=${cfg.interlock}` : ''),
   );
   logLine(
     'policy: microbatch-tiers=' +

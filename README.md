@@ -78,12 +78,13 @@ receiver.free();
 
 The `Opts` builder overrides the profile default at `init` (chunk
 size, outer cipher, parallax on/off, wrapper on/off, MAC name,
-palette, worker cap); every setter mutates and returns the same
-instance. The resolved shape is written into the blob, so the
-receiver loads it with no opts of its own:
+palette, worker cap, `interlock` (`"48"` | `"168"`, `""` = default
+48-bit; `"168"` requires a 512-bit hash)); every setter mutates and
+returns the same instance. The resolved shape is written into the
+blob, so the receiver loads it with no opts of its own:
 
 ```ts
-const opts = new Opts().withMode(2).withChunkSize(65536).withWrapper(false);
+const opts = new Opts().withMode(2).withInterlock('168').withChunkSize(65536).withWrapper(false);
 const sender = Pipeline.init('singlemsg-triple-mac-v1', opts);
 const receiver = Pipeline.load(sender.save());
 ```

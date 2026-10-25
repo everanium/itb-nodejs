@@ -96,6 +96,8 @@ export interface Config {
   barrierFill: number;
   /** DRBG fill primitive; "" = profile default (auto tier). */
   drbg: string;
+  /** Interlocked Barrier chunk width: "" | "48" | "168". */
+  interlock: string;
   /** 0 = inherit from the environment. */
   gomaxprocs: number;
   /** Per-worker iterations between rotations; 0 = never. */
@@ -132,6 +134,7 @@ export function newConfig(): Config {
     chunkSize: 0,
     barrierFill: 0,
     drbg: '',
+    interlock: '',
     gomaxprocs: 0,
     rekeyEvery: 0,
     blobCycleEvery: 0,

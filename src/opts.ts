@@ -20,6 +20,11 @@ export class Opts {
     return this.withRaw('mode', String(n));
   }
 
+  /** Overrides the Interlocked Barrier chunk width: `"48"` or `"168"`. */
+  withInterlock(width: string): this {
+    return this.withRaw('interlock', width);
+  }
+
   /** Hex-encodes the parallax master override (`pm`). */
   withPermMaster(master: Uint8Array): this {
     return this.withRaw('pm', hex(master));
