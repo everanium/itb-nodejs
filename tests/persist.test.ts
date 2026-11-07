@@ -127,6 +127,11 @@ test('the Profile type exposes the inspection-only fields', () => {
   assert.equal(record.nonce_bits, 256);
   assert.equal(record.barrier_fill, 4);
 
+  const p3 = Pipeline.init(PROFILE, new Opts().withMode(3));
+  const record3: Profile = inspect(p3.save());
+  p3.free();
+  assert.equal(record3.container_mode, 3);
+
   // The registry entry is the recipe alone — neither field is part of
   // it, so both read as undefined rather than as zero.
   const registry: Profile = lookup(PROFILE);

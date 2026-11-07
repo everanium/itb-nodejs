@@ -124,7 +124,7 @@ const FLAGS: readonly FlagRow[] = [
   ['blob-cycle-every', 'int', Kind.Int64, 0,
     'reopen each pipeline from its session blob every N iterations per worker; 0 = never'],
   ['blob-mode', 'int', Kind.Int, 1,
-    'container floor sizing mode: 1 (per-region, default) | 2 (per-container)'],
+    'container floor sizing mode: 1 (per-region, default) | 2 (per-container) | 3 (gauss-posit)'],
   ['chunk-size', 'string', Kind.Str, '0',
     'streaming chunk-size budget (e.g. 4MB); 0 = profile default; inert for pure message shape'],
   ['drbg', 'string', Kind.Str, '',
@@ -471,8 +471,10 @@ function parseFlags(argv: string[]): [number, Config] {
     return [-1, cfg];
   }
   cfg.blobMode = num('blob-mode');
-  if (![1, 2].includes(cfg.blobMode)) {
-    errLine(`--blob-mode must be 1 (per-region) | 2 (per-container), got ${cfg.blobMode}`);
+  if (![1, 2, 3].includes(cfg.blobMode)) {
+    errLine(
+      `--blob-mode must be 1 (per-region) | 2 (per-container) | 3 (gauss-posit), got ${cfg.blobMode}`,
+    );
     return [-1, cfg];
   }
   cfg.barrierFill = num('barrier-fill');
@@ -565,7 +567,9 @@ function logPipelineInitialised(profile: string, blob: Uint8Array): void {
       `mac=${recordStr(record.mac)} ` +
       `parallax=${onOff(record.parallax === true)} ` +
       `wrapper=${onOff(record.wrapper === true)}` +
-      (record.container_mode === 2 ? ` container-mode=${record.container_mode}` : '') +
+      (record.container_mode === 2 || record.container_mode === 3
+        ? ` container-mode=${record.container_mode}`
+        : '') +
       (record.drbg !== undefined && record.drbg !== '' ? ` drbg=${record.drbg}` : '') +
       (record.interlock !== undefined && record.interlock !== '' ? ` interlock=${record.interlock}` : ''),
   );

@@ -88,7 +88,7 @@ export interface Config {
   keyBits: number;
   /** 0 = profile default. */
   nonceBits: number;
-  /** Container floor sizing mode: 1 (per-region, default) | 2 (per-container). */
+  /** Container floor sizing mode: 1 (per-region, default) | 2 (per-container) | 3 (gauss-posit). */
   blobMode: number;
   /** 0 = profile default. */
   chunkSize: number;
